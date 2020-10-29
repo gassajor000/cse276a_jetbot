@@ -3,11 +3,13 @@
     WallE:
 """
 import time
+import math
 
 import jetbot
 
 
 class WallE:
+    SPEED = 0.5
     def __init__(self):
         self.robot = jetbot.robot.Robot()
         self.position = self.PositionModel()
@@ -26,21 +28,21 @@ class WallE:
 
     def calibrate(self):
         # drive full speed for 1s
-        self.robot.forward(1, 1)
+        self.robot.forward(self.SPEED)
         time.sleep(1)
         self.robot.stop()
         # enter distance traveled
-        d = input("Enter distance traveled: ")
+        d = float(input("Enter distance traveled: "))
 
         # rotate full speed for 1s
-        self.robot.right(1)
+        self.robot.right(self.SPEED)
         time.sleep(1)
         self.robot.stop()
         # enter angle rotated
-        t = input("Enter angle rotated: ")
+        t = float(input("Enter degrees rotated (clockwise): "))
 
         # update movement model
-        self.movement.calibrate(d, t)
+        self.movement.calibrate(d, math.radians(t))
 
     def _turn_to_theta(self, theta):
         """turn to absolute orientation theta"""
@@ -77,8 +79,8 @@ class WallE:
         # WHEEL_SEPARATION = 10.2 # cm
 
         def __init__(self):
-            self.distance_ref = 1   # meters traveled at full speed for 1s
-            self.angle_ref = 3.14   # angle rotated at full speed for 1s
+            self.distance_ref = 1   # meters traveled over 1s
+            self.angle_ref = 3.14   # angle (cw) rotated over 1s
 
         def calibrate(self, distance, angle):
             self.distance_ref = distance

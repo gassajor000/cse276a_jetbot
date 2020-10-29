@@ -4,7 +4,7 @@
 """
 import time
 
-from .WallE import WallE
+from WallE import WallE
 
 if __name__ == '__main__':
     WALLE = WallE()
