@@ -32,7 +32,7 @@ class WallE:
         time.sleep(1)
         self.robot.stop()
         # enter distance traveled
-        d = float(input("Enter distance traveled: "))
+        d = float(input("Enter cm traveled: "))
 
         # rotate full speed for 1s
         self.robot.right(self.SPEED)
@@ -42,7 +42,7 @@ class WallE:
         t = float(input("Enter degrees rotated (clockwise): "))
 
         # update movement model
-        self.movement.calibrate(d, math.radians(t))
+        self.movement.calibrate(d/100.0, math.radians(t))
 
     def _turn_to_theta(self, theta):
         """turn to absolute orientation theta"""
@@ -79,8 +79,8 @@ class WallE:
         # WHEEL_SEPARATION = 10.2 # cm
 
         def __init__(self):
-            self.distance_ref = 1   # meters traveled over 1s
-            self.angle_ref = 3.14   # angle (cw) rotated over 1s
+            self.distance_ref = .265    # meters traveled over 1s
+            self.angle_ref = 2.967      # radians (cw) rotated over 1s
 
         def calibrate(self, distance, angle):
             self.distance_ref = distance
