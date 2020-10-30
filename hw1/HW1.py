@@ -8,7 +8,9 @@ from WallE import WallE
 
 if __name__ == '__main__':
     WALLE = WallE()
-    WALLE.calibrate()
+    WallE.drive_to(-1,0,0)
+    WallE.drive_to(-1,1,1.57)
+    WallE.drive_to(-2,1,0)
 
     # # open way points file
     # waypoints = []
