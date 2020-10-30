@@ -59,7 +59,7 @@ class WallE:
 
     def _drive(self, distance):
         """drive distance forward"""
-        t_drive = self.movement.get_rotation_time(distance)
+        t_drive = self.movement.get_drive_duration(distance)
         self.position.move_forward(distance)
 
         self.robot.forward(speed=self.SPEED)
