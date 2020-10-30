@@ -106,7 +106,6 @@ class WallE:
             # t1 >= t0: t1 - t0, t0 > t1: (t0 - 2pi) + t1
             return theta - self.theta if theta >= self.theta else (2 * math.pi) - self.theta + theta
 
-
     class MovementModel():
         # WHEEL_CIRCUMFERENCE = 21.5  # cm
         # WHEEL_SEPARATION = 10.2 # cm
@@ -121,6 +120,8 @@ class WallE:
 
         def get_drive_duration(self, distance, speed=0.5):
             """returns time needed to drive :distance: at :speed:"""
+            return distance / self.distance_ref
 
-        def get_rotation_time(self, theta):
+        def get_rotation_time(self, theta, speed=0.5):
             """returns time needed to rotate clockwise theta radians"""
+            return theta / self.angle_ref
