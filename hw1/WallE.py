@@ -17,14 +17,17 @@ class WallE:
 
     def drive_to(self, x, y, theta):
         # get angle to rotate towards x, y
+        theta_drive = self.position.get_abs_angle_to(x, y)
         # rotate towards x,y
+        self._turn_to_theta(theta_drive)
 
         # get distance to x, y
+        dist = self.position.get_distance_to(x, y)
         # drive forward to x, y
+        self._drive(dist)
 
-        # get angle to theta
         # rotate to theta
-        pass
+        self._turn_to_theta(theta)
 
     def calibrate(self):
         # drive full speed for 1s
@@ -46,11 +49,22 @@ class WallE:
 
     def _turn_to_theta(self, theta):
         """turn to absolute orientation theta"""
-        pass
+        delta = self.position.get_rel_angle_to(theta)
+        t_rotate = self.movement.get_rotation_time(delta)
+        self.position.rotate_clockwise(delta)
+
+        self.robot.right(speed=self.SPEED)
+        time.sleep(t_rotate)
+        self.robot.stop()
 
     def _drive(self, distance):
         """drive distance forward"""
-        self.robot.forward()
+        t_drive = self.movement.get_rotation_time(distance)
+        self.position.move_forward(distance)
+
+        self.robot.forward(speed=self.SPEED)
+        time.sleep(t_drive)
+        self.robot.stop()
 
     class PositionModel():
         def __init__(self, x=0, y=0, theta=0):
