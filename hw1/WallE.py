@@ -9,7 +9,9 @@ import jetbot
 
 
 class WallE:
-    SPEED = 0.5
+    SPEED_LEFT = 0.5
+    SPEED_RIGHT = 0.5
+
     def __init__(self):
         self.robot = jetbot.robot.Robot()
         self.position = self.PositionModel()
@@ -30,15 +32,30 @@ class WallE:
         self._turn_to_theta(theta)
 
     def calibrate(self):
+        # calibrate left and right speeds
+        print("Adjust right speed until robot drives straight")
+        cmd = 'x'
+        while cmd not in ['c', 'C']:
+            self._forward()
+            cmd = input('Type L to curve left, R to curve right, or C to continue')
+            if cmd in ['l', 'L']:
+                self.SPEED_RIGHT += 0.005
+            if cmd in ['r', 'R']:
+                self.SPEED_RIGHT -= 0.005
+
+        print("Speed calibration complete: left speed {:.2f} right speed {:.2f}".format(self.SPEED_LEFT, self.SPEED_RIGHT))
+
+        print("Distance calibration")
         # drive full speed for 1s
-        self.robot.forward(self.SPEED)
+        self._forward()
         time.sleep(1)
         self.robot.stop()
         # enter distance traveled
         d = float(input("Enter cm traveled: "))
 
+        print("Rotation calibration")
         # rotate full speed for 1s
-        self.robot.right(self.SPEED)
+        self._right()
         time.sleep(1)
         self.robot.stop()
         # enter angle rotated
@@ -53,7 +70,7 @@ class WallE:
         t_rotate = self.movement.get_rotation_time(delta)
         self.position.rotate_clockwise(delta)
 
-        self.robot.right(speed=self.SPEED)
+        self._right()
         time.sleep(t_rotate)
         self.robot.stop()
 
@@ -62,9 +79,15 @@ class WallE:
         t_drive = self.movement.get_drive_duration(distance)
         self.position.move_forward(distance)
 
-        self.robot.forward(speed=self.SPEED)
+        self._forward()
         time.sleep(t_drive)
         self.robot.stop()
+
+    def _forward(self):
+        self.robot.set_motors(self.SPEED_LEFT, self.SPEED_RIGHT)
+
+    def _right(self):
+        self.robot.set_motors(self.SPEED_LEFT, -self.SPEED_RIGHT)
 
     class PositionModel():
         def __init__(self, x=0, y=0, theta=0):
