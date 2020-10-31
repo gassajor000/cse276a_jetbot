@@ -9,8 +9,11 @@ from WallE import WallE
 if __name__ == '__main__':
     W = WallE()
     W.calibrate()
+    input('press any key to start sequence')
     W.drive_to(-1, 0, 0)
+    time.sleep(1)
     W.drive_to(-1, 1, 1.57)
+    time.sleep(1)
     W.drive_to(-2, 1, 0)
 
     # # open way points file

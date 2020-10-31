@@ -10,7 +10,7 @@ import jetbot
 
 class WallE:
     SPEED_LEFT = 0.5
-    SPEED_RIGHT = 0.5
+    SPEED_RIGHT = 0.515
 
     def __init__(self):
         self.robot = jetbot.robot.Robot()
@@ -44,7 +44,7 @@ class WallE:
                 self.SPEED_RIGHT -= 0.005
 
         print("Speed calibration complete: left speed {:.2f} right speed {:.2f}".format(self.SPEED_LEFT, self.SPEED_RIGHT))
-
+        input('Press any key to continue')
         print("Distance calibration")
         # drive full speed for 1s
         self._forward()
