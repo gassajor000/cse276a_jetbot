@@ -43,6 +43,7 @@ class WallE:
             if cmd in ['r', 'R']:
                 self.SPEED_RIGHT -= 0.005
 
+        self.robot.stop()
         print("Speed calibration complete: left speed {:.2f} right speed {:.2f}".format(self.SPEED_LEFT, self.SPEED_RIGHT))
         input('Press any key to continue')
         print("Distance calibration")
