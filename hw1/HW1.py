@@ -10,9 +10,10 @@ def drive_to_waypoints(walle):
     # open way points file
     waypoints = []
     with open('waypoints.txt') as fl:
-        for line in fl.readline():
-            x, y, theta = line.split(',')
-            waypoints.append((x, y, theta))
+        for line in fl.readlines():
+            if line != '' and line != ' ':
+                x, y, theta = line.split(',')
+                waypoints.append((float(x), float(y), float(theta)))
 
     for point in waypoints:
         x, y, theta = point
@@ -20,6 +21,8 @@ def drive_to_waypoints(walle):
         time.sleep(1)
 
 if __name__ == '__main__':
+
+
     W = WallE()
     W.calibrate()
     input('press any key to start sequence')
