@@ -19,6 +19,23 @@ class WallE:
         self.movement = self.MovementModel()
 
     def drive_to(self, x, y, theta):
+        """
+        while not @ x,y:
+            while not theta_to_xy:
+                turn to x,y
+                evaluate position.theta
+
+            while distance_traveled != dist:
+                drive fwd
+                evaluate x,y
+                evaluate distance_traveled
+
+        while not @ theta:
+            turn to theta
+            evaluate position.theta
+        """
+
+
         # get angle to rotate towards x, y
         theta_drive = self.position.get_abs_angle_to(x, y)
         # rotate towards x,y
@@ -65,6 +82,8 @@ class WallE:
 
         # update movement model
         self.movement.calibrate(d/100.0, math.radians(t))
+
+        # TODO add camera calibration
 
     def _turn_to_theta(self, theta):
         """turn to absolute orientation theta"""
