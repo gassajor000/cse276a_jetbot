@@ -4,6 +4,18 @@
         (Just object detection and identification)
 """
 
+# load categories
+import json
+
+categories = {}
+with open('categories.json','r') as COCO:
+    items = json.loads(COCO.read())
+    for cat in items:
+         categories[cat['id']] = cat['name']
+
+def get_category(label):
+    return categories[label]
+
 # Setup object detector
 from jetbot import ObjectDetector
 
@@ -15,17 +27,11 @@ from jetbot import Camera
 camera = Camera.instance(width=300, height=300)
 detections = model(camera.value)
 
-print(detections)
 
 # Code to display objects in jupyter notebook
 from IPython.display import display
 import ipywidgets.widgets as widgets
 
-detections_widget = widgets.Textarea()
-
-detections_widget.value = str(detections)
-
-display(detections_widget)
 
 image_number = 0
 object_number = 0
@@ -45,13 +51,10 @@ from jetbot import bgr8_to_jpeg
 
 image_widget = widgets.Image(format='jpeg', width=300, height=300)
 label_widget = widgets.IntText(value=1, description='tracked label')
-speed_widget = widgets.FloatSlider(value=0.4, min=0.0, max=1.0, description='speed')
-turn_gain_widget = widgets.FloatSlider(value=0.8, min=0.0, max=2.0, description='turn gain')
 
 display(widgets.VBox([
+    image_widget,
     label_widget,
-    speed_widget,
-    turn_gain_widget
 ]))
 
 width = int(image_widget.width)
@@ -82,31 +85,43 @@ def closest_detection(detections):
             closest_detection = det
     return closest_detection
 
+counter = 0
+frequency = 2   # every other frame
 
 def execute(change):
-    image = change['new']
+    global counter, frequency
+    if counter % frequency == 0:
+        image = change['new']
 
-    # compute all detected objects
-    detections = model(image)
+        # compute all detected objects
+        detections = model(image)
 
-    # draw all detections on image
-    for det in detections[0]:
-        bbox = det['bbox']
-        cv2.rectangle(image, (int(width * bbox[0]), int(height * bbox[1])),
-                      (int(width * bbox[2]), int(height * bbox[3])), (255, 0, 0), 2)
+        # draw all detections on image
+        for det in detections[0]:
+            bbox = det['bbox']
+            cv2.rectangle(image, (int(width * bbox[0]), int(height * bbox[1])),
+                          (int(width * bbox[2]), int(height * bbox[3])), (255, 0, 0), 2)
+            cv2.putText(image, get_category(det['label']),
+                        (int(width * bbox[0]), int(height * bbox[1]) + 15),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,  # font scale
+                        (255, 255, 255),    # font color
+                        1)  # line type
 
-    # select detections that match selected class label
-    matching_detections = [d for d in detections[0] if d['label'] == int(label_widget.value)]
+        # select detections that match selected class label
+        matching_detections = [d for d in detections[0] if d['label'] == int(label_widget.value)]
 
-    # get detection closest to center of field of view and draw it
-    det = closest_detection(matching_detections)
-    if det is not None:
-        bbox = det['bbox']
-        cv2.rectangle(image, (int(width * bbox[0]), int(height * bbox[1])),
-                      (int(width * bbox[2]), int(height * bbox[3])), (0, 255, 0), 5)
+        # get detection closest to center of field of view and draw it
+        det = closest_detection(matching_detections)
+        if det is not None:
+            bbox = det['bbox']
+            cv2.rectangle(image, (int(width * bbox[0]), int(height * bbox[1])),
+                          (int(width * bbox[2]), int(height * bbox[3])), (0, 255, 0), 5)
 
-    # update image widget
-    image_widget.value = bgr8_to_jpeg(image)
+        # update image widget
+        image_widget.value = bgr8_to_jpeg(image)
+
+    counter += 1
 
 
 execute({'new': camera.value})
