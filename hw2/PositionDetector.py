@@ -32,7 +32,7 @@ class PositionDetector:
         filter.H =  1 0 0
                     0 1 0
                     0 0 1
-        u vector     distance
+        u vector    distance
                     rotation
         filter.B =  cos(theta) 0
                     sin(theta) 0
@@ -49,9 +49,9 @@ class PositionDetector:
         """
         # setup kalman filter
         ident = numpy.array([
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1],
+            [1., 0., 0.],
+            [0., 1., 0.],
+            [0., 0., 1.],
         ])
         self.filter = KalmanFilter(dim_x=3, dim_z=3)
         self.filter.x = numpy.array([[init_pos[0], init_pos[1], init_pos[2]]])
@@ -71,9 +71,9 @@ class PositionDetector:
 
     def _make_B_vector(self):
         return numpy.array([
-            [numpy.cos(self.filter.x[2]), 0],
-            [numpy.sin(self.filter.x[2]), 0],
-            [0, 1]
+            [numpy.cos(self.filter.x[2]), 0.],
+            [numpy.sin(self.filter.x[2]), 0.],
+            [0., 1.]
         ])
 
     def get_position(self, distance, rotation):
