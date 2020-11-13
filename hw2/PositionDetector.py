@@ -136,7 +136,7 @@ class PositionDetector:
         CONFIDENCE_2LM = 2
         CONFIDENCE_3LM = 3
 
-        PARTICLE_BATCH_SIZE = 100
+        PARTICLE_BATCH_SIZE = 150
 
 
         def __init__(self, measurement_noise, estimation_proximity_threshold):
@@ -152,7 +152,7 @@ class PositionDetector:
             @staticmethod
             def from_ring(origin, radius, max_err):
                 rand_r = radius + random.uniform(-max_err, max_err)
-                theta = random.uniform(0, numpy.pi)
+                theta = random.uniform(0, 2*numpy.pi)
                 x = origin[0] + rand_r* math.cos(theta)
                 y = origin[1] + rand_r* math.sin(theta)
 
@@ -170,7 +170,6 @@ class PositionDetector:
             def __repr__(self):
                 return "Particle " + str(self)
 
-
         def get_position_from_landmarks(self, landmark_dists, estimated_position):
             """
             Estimate the position using relative distances to landmarks.
@@ -178,6 +177,22 @@ class PositionDetector:
             :param estimated_position: (x, y) of the robot's estimated position
             :return: tuple, ((x, y), confidence) of estimated position
             """
+            def plot(particles):     # for debugging
+                from matplotlib import pyplot
+                color = {0: 'red', 1:'blue', 2:'green', 3: 'yellow', 4: 'orange'}
+                x = list(map(lambda p: p.x, particles))
+                y = list(map(lambda p: p.y, particles))
+                colors = list(map(lambda p: color[p.num_rings], particles))
+                circles = list(map(lambda lmk: pyplot.Circle((lmk[0][0], lmk[0][1]), lmk[1], fill=False), landmark_dists))
+                ax = pyplot.gca()
+                ax.set_xlim((0, 3))
+                ax.set_ylim((0, 3))
+                ax.scatter([estimated_position[0]], [estimated_position[1]], marker='*')
+                ax.scatter(x, y, c=colors)
+                for circle in circles:
+                    ax.add_artist(circle)
+                pyplot.show()
+
 
             if len(landmark_dists) == 0:
                 return estimated_position, self.CONFIDENCE_0LM  # Your guess is as good as mine
@@ -213,9 +228,10 @@ class PositionDetector:
                 # no overlap between rings, error out
                 return None, None
 
-            best_particles = filter(lambda p: p.num_rings == most_rings, particles)
+            best_particles = list(filter(lambda p: p.num_rings == most_rings, particles))
+            # plot(best_particles)  # Uncomment for debug plot
 
-            if most_rings < len(landmark_dists):    # did not have an ideal reading/overlap zone (likely a bad distance measurement)
+            if most_rings < len(landmark_dists) or most_rings == 2:    # did not have an ideal reading/overlap zone (likely a bad distance measurement)
                 # use estimated position to narrow particles
                 best_particles = filter(lambda p: p.is_inside_rings(estimated_position, self.estimation_proximity_threshold, 0), best_particles)
 

@@ -58,8 +58,8 @@ class TestPositionLocator(TestCase):
         get_position_from_landmarks returns a point close to the intersect of the two circles and the estimated position
         """
         test_cases = [  # list of landmarks/measurement pairs, estimated position, correct_position
-            ([((0, 0), 0.5), ((1, 0), 1)], (0.5, 0.5), (0.125, 0.4841)),    # simple case
-            ([((1.6, 0.6), 0.5), ((2.5, 1.4), 1)], (2, 1.0), (1.546, 1.097)),    # simple case
+            ([((0, 0), 0.5), ((1, 0), 1)], (0.25, 0.4), (0.125, 0.4841)),    # simple case
+            ([((1.6, 0.6), 0.5), ((2.5, 1.4), 1)], (2, 0.6), (2.087, 0.487)),    # simple case
             ([((1.6, 0.6), 0.5), ((2.5, 1.4), 1)], (1.5, 1.2), (1.546, 1.097)),    # simple case
         ]
 
@@ -105,5 +105,61 @@ class TestPositionLocator(TestCase):
             print("Testing: ", landmarks, est_position)
             refined_pos, confidence = self.locator.get_position_from_landmarks(landmarks, est_position)
             print(refined_pos)
+            self.assertIsNone(refined_pos, "Locator returned a position with bad data!")
+            self.assertIsNone(confidence, "Locator returned a confidence with bad data!")
+
+    def test_get_position_from_landmarks_three_circles_one_intersect(self):
+        """
+        get_position_from_landmarks returns a point close to the intersect of the three circles
+        """
+        test_cases = [  # list of landmarks/measurement pairs, estimated position, correct_position
+            ([((0, 0), 0.5), ((0.5, 1), 1), ((1, -1), math.sqrt(5)/2)], (0.4, 0), (0.5, 0)),    # simple case
+            ([((0, 0), 0.5), ((0.5, 1), 1), ((1, -1), math.sqrt(5)/2)], (5, 5), (0.5, 0)),    # ignores estimated position
+            ([((0, 0), 0.5), ((0.5, 1), 0.95), ((1, -1), math.sqrt(5)/2)], (0.4, 0), (0.5, 0)),    # not quite intersect
+        ]
+
+        for landmarks, est_position, correct_pos in test_cases:
+            print("Testing: ", landmarks, est_position, correct_pos)
+            refined_pos, confidence = self.locator.get_position_from_landmarks(landmarks, est_position)
+            print(refined_pos, confidence)
+            self.assertIsNotNone(refined_pos, "Locator was not able to find a position!")
+            self.assertAlmostEqual(correct_pos[0], refined_pos[0], delta=0.1, msg="Locator did not return the correct position!")
+            self.assertAlmostEqual(correct_pos[1], refined_pos[1], delta=0.1, msg="Locator did not return the correct position!")
+            self.assertEqual(PositionDetector.PositionLocater.CONFIDENCE_3LM, confidence,
+                             "Locator did not indicate a 1 landmark confidence!")
+
+    def test_get_position_from_landmarks_three_circles_six_intersects(self):
+        """
+        get_position_from_landmarks returns a point close to the intersect of the three circles and closest to the estimated position
+        """
+        test_cases = [  # list of landmarks/measurement pairs, estimated position, correct_position
+            ([((0, 0), 0.5), ((0.5, 1), 1), ((1, -1), math.sqrt(5))], (0.4, 0), (0.5, 0)),    # simple case
+            ([((0, 0), 0.5), ((0.5, 1), 1), ((1, -1), math.sqrt(5))], (-.4, 0.8), (-.455, 0.703)),    # move estimated position
+        ]
+
+        for landmarks, est_position, correct_pos in test_cases:
+            print("Testing: ", landmarks, est_position, correct_pos)
+            refined_pos, confidence = self.locator.get_position_from_landmarks(landmarks, est_position)
+            print(refined_pos, confidence)
+            self.assertIsNotNone(refined_pos, "Locator was not able to find a position!")
+            self.assertAlmostEqual(correct_pos[0], refined_pos[0], delta=0.1, msg="Locator did not return the correct position!")
+            self.assertAlmostEqual(correct_pos[1], refined_pos[1], delta=0.1, msg="Locator did not return the correct position!")
+            self.assertEqual(PositionDetector.PositionLocater.CONFIDENCE_2LM, confidence,
+                             "Locator did not indicate a 1 landmark confidence!")
+
+    def test_get_position_from_landmarks_three_circles_zero_intersects(self):
+        """
+        get_position_from_landmarks errors out if none of the circles overlap or no 2 circle intersects are
+        close to the estimated position
+        """
+        test_cases = [  # list of landmarks/measurement pairs, estimated position, correct_position
+            ([((0, 0), 0.25), ((1, 1), .25), ((2, 2), .25)], (0.4, 0)),    # No intersections
+            ([((0, 0), 0.5), ((0.5, 1), 1), ((1, -1), math.sqrt(5))], (5, 5)),    # far from estimated position
+        ]
+
+        for landmarks, est_position in test_cases:
+            print("Testing: ", landmarks, est_position)
+            refined_pos, confidence = self.locator.get_position_from_landmarks(landmarks, est_position)
+            print(refined_pos, confidence)
             self.assertIsNone(refined_pos, "Locator returned a position with bad data!")
             self.assertIsNone(confidence, "Locator returned a confidence with bad data!")
