@@ -2,10 +2,16 @@
     created by Jordan Gassaway, 11/10/2020
     PositionDetector: Uses the camera to detect the current position
 """
+import math
 import random
 
 from filterpy.kalman import KalmanFilter
 import numpy
+
+
+def dist(x1, y1, x2, y2):
+    # distance between 2 points
+    return numpy.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
 class PositionDetector:
     MOVEMENT_NOISE = 0.1   # +/- 10 cm on driving
@@ -15,6 +21,7 @@ class PositionDetector:
 
     def __init__(self, init_pos=(0.0, 0.0, 0.0)):
         """
+
         Initialize camera, object detection and Kalman Fiilter
 
         :param init_pos: initial position (x , y, theta)
@@ -63,7 +70,7 @@ class PositionDetector:
 
         # todo setup camera & object detection
         self.detector = self.LandmarkDetector()
-        self.locator = self.PositionLocater(self.MEASUREMENT_NOISE, self.)
+        self.locator = self.PositionLocater(self.MEASUREMENT_NOISE, self.ESTIMATION_PROXIMITY)
 
     def _make_B_vector(self):
         return numpy.array([
@@ -131,37 +138,62 @@ class PositionDetector:
 
         PARTICLE_BATCH_SIZE = 100
 
+
         def __init__(self, measurement_noise, estimation_proximity_threshold):
             self.estimation_proximity_threshold = estimation_proximity_threshold
             self.measurement_noise = measurement_noise
+
+        class Particle():
+            def __init__(self, x, y):
+                self.x = x
+                self.y = y
+                self.num_rings = 0
+
+            @staticmethod
+            def from_ring(origin, radius, max_err):
+                rand_r = radius + random.uniform(-max_err, max_err)
+                theta = random.uniform(0, numpy.pi)
+                x = origin[0] + rand_r* math.cos(theta)
+                y = origin[1] + rand_r* math.sin(theta)
+
+                return PositionDetector.PositionLocater.Particle(x, y)
+
+
+            def is_inside_rings(self, origin, r_outer, r_inner):
+                # True if particle lies inside the two rings, False otherwise
+                d = dist(self.x, self.y, origin[0], origin[1])
+                return d <= r_outer and d >= r_inner
+
+            def __str__(self):
+                return "({:.4f}, {:.4f}, {})".format(self.x, self.y, self.num_rings)
+
+            def __repr__(self):
+                return "Particle " + str(self)
+
 
         def get_position_from_landmarks(self, landmark_dists, estimated_position):
             """
             Estimate the position using relative distances to landmarks.
             :param landmark_dists: list of tuples containing a landmark and a distance measurement.
             :param estimated_position: (x, y) of the robot's estimated position
-            :return: tuple, (x, y, confidence) of estimated position
+            :return: tuple, ((x, y), confidence) of estimated position
             """
-            def _dist(x1, y1, x2, y2):
-                # distance between 2 points
-                return numpy.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
-
-            def _particle():        # x, y , num rings
-                return (random.uniform(0, 3), random.uniform(0, 3), 0)
-
-            def _particle_inside_rings(particle, origin, r_outer, r_inner):
-                # True if particle lies inside the two rings, False otherwise
-                dist = _dist(particle[0], particle[1], origin[0], origin[1])
-                return dist <= r_outer and dist >= r_inner
 
             if len(landmark_dists) == 0:
-                return estimated_position[0], estimated_position[1], self.CONFIDENCE_0LM  # Your guess is as good as mine
+                return estimated_position, self.CONFIDENCE_0LM  # Your guess is as good as mine
             elif len(landmark_dists) == 1:
-                # TODO return closest particle on ring to estimated position
-                pass
+                # return closest particle on ring to estimated position
+                origin = landmark_dists[0][0][0], landmark_dists[0][0][1]
+                r = landmark_dists[0][1]
+                v = estimated_position[0] - origin[0], estimated_position[1] - origin[1]
+                d = dist(estimated_position[0], estimated_position[1], origin[0], origin[1])
+                a = origin[0] + v[0]/d * r,  origin[1] + v[1]/d * r
+                return a, self.CONFIDENCE_1LM
 
             # generate a list of particles
-            particles = [_particle() for _ in range(self.PARTICLE_BATCH_SIZE)]
+            particles = []
+            for lmk in landmark_dists:
+                particles += [self.Particle.from_ring(lmk[0], lmk[1], self.measurement_noise) for _ in range(self.PARTICLE_BATCH_SIZE)]
 
             # record the number of rings each particle is in range in
             most_rings = 0      # keep track of the most number of rings particles fall in
@@ -171,20 +203,26 @@ class PositionDetector:
                 ring_inner = lmk[1] - self.measurement_noise
 
                 for particle in particles:
-                    if _particle_inside_rings(particle, lmk[0], ring_outer, ring_inner):
-                        particle[2] += 1
+                    if particle.is_inside_rings(lmk[0], ring_outer, ring_inner):
+                        particle.num_rings += 1
 
-                    if particle[2] > most_rings:    # update most rings
-                        most_rings = particle[2]
+                    if particle.num_rings > most_rings:    # update most rings
+                        most_rings = particle.num_rings
 
             if most_rings == 1:
                 # no overlap between rings, error out
-                return None
+                return None, None
 
-            best_particles = filter(lambda p: p[2] == most_rings, particles)
-            if most_rings < len(landmark_dists):
-                # TODO use estimated position to narrow particles
-                best_particles = filter(lambda p: _dist(estimated_position[0], estimated_position[1], p[0], p[1]) <= self.estimation_proximity_threshold, best_particles)
+            best_particles = filter(lambda p: p.num_rings == most_rings, particles)
 
-            center = numpy.mean(list(best_particles), axis=0)
-            return center[0], center[1], self.CONFIDENCE_2LM if most_rings == 2 else self.CONFIDENCE_3LM
+            if most_rings < len(landmark_dists):    # did not have an ideal reading/overlap zone (likely a bad distance measurement)
+                # use estimated position to narrow particles
+                best_particles = filter(lambda p: p.is_inside_rings(estimated_position, self.estimation_proximity_threshold, 0), best_particles)
+
+            coords = list(map(lambda p: (p.x, p.y), best_particles))  # convert to tuples for numpy
+
+            if len(coords) == 0:    # No particles were close to the estimated position!
+                return None, None
+
+            center = numpy.mean(list(coords), axis=0)
+            return tuple(center), self.CONFIDENCE_2LM if most_rings == 2 else self.CONFIDENCE_3LM
