@@ -78,7 +78,7 @@ class TestPositionLocator(TestCase):
         get_position_from_landmarks returns a point close to the intersect of the two circles and the estimated position
         """
         test_cases = [  # list of landmarks/measurement pairs, estimated position, correct_position
-            ([((0, 0), 0.5), ((1, 0), 0.5)], (0.4, 0.4), (0.5, 0)),    # simple case
+            ([((0, 0), 0.5), ((1, 0), 0.5)], (0.4, 0.2), (0.5, 0)),    # simple case
             ([((1, 1), 0.25), ((1, 1.5), 0.25)], (1, 1), (1, 1.25)),    # simple case
             ([((1, 1), 0.25), ((1, 1.5), 0.248)], (1, 1), (1, 1.25)),    # circles don't quite intersect
         ]
@@ -99,6 +99,7 @@ class TestPositionLocator(TestCase):
         """
         test_cases = [  # list of landmarks/measurement pairs, estimated position, correct_position
             ([((0, 0), 0.5), ((2, 2), 0.5)], (0.4, 0.4)),    # simple case
+            ([((0, 0), 0.5), ((1, 0), 0.5)], (0.8, 0.8)),   # estimated position too far away
         ]
 
         for landmarks, est_position in test_cases:
