@@ -8,6 +8,8 @@ import random
 from filterpy.kalman import KalmanFilter
 import numpy
 
+from jetbot import ObjectDetector, Camera
+
 
 def dist(x1, y1, x2, y2):
     # distance between 2 points
@@ -23,6 +25,7 @@ class PositionDetector:
         """
 
         Initialize camera, object detection and Kalman Fiilter
+
 
         :param init_pos: initial position (x , y, theta)
 
@@ -68,9 +71,13 @@ class PositionDetector:
         ])
         self.filter.R = ident * self.MEASUREMENT_NOISE
 
-        # todo setup camera & object detection
         self.detector = self.LandmarkDetector()
         self.locator = self.PositionLocater(self.MEASUREMENT_NOISE, self.ESTIMATION_PROXIMITY)
+
+        # Setup camera & object detection
+        self.model = ObjectDetector('ssd_mobilenet_v2_coco.engine')
+        self.camera = Camera.instance(width=300, height=300)
+
 
     def _make_B_vector(self):
         return numpy.array([
@@ -87,8 +94,10 @@ class PositionDetector:
         # predict
         self.filter.predict(u=numpy.array([distance, rotation]), B=self._make_B_vector())
 
-        # TODO: measure location using camera
-        z = self.locator.get_position_from_landmarks(self.detector.detect_landmarks(), tuple(self.filter.x))
+        # measure location using camera
+        detections = self.model(self.camera.value)
+        z = self.locator.get_position_from_landmarks(self.detector.detect_landmarks(detections), tuple(self.filter.x))
+        # todo measure orientation
         self.filter.update(z=z)
 
         return self.filter.x

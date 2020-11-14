@@ -23,9 +23,13 @@ def drive_to_waypoints(walle):
 if __name__ == '__main__':
 
 
-    W = WallE()
-    W.calibrate()
+    # W = WallE()
+    # W.calibrate()
+    from hw2.PositionDetector import PositionDetector
+
+    p = PositionDetector()
     input('press any key to start sequence')
+    p.detector.calibrate(p.model, p.camera)
     # W.drive_to(-1, 0, 0)
     # time.sleep(1)
     # W.drive_to(-1, 1, 1.57)
