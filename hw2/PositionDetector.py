@@ -78,6 +78,7 @@ class PositionDetector:
         self.model = ObjectDetector('ssd_mobilenet_v2_coco.engine')
         self.camera = Camera.instance(width=300, height=300)
 
+        # TODO camera calibration
 
     def _make_B_vector(self):
         return numpy.array([
@@ -118,6 +119,7 @@ class PositionDetector:
         CAMERA_OFFSET = 2.0  # cm between the camera and the position model point
         FOCAL_LENGTH = .0315     # 3.15 cm
         PIXEL_SIZE = 0.000112   # 1.12 um /pixel
+        RAD_PER_PIXEL = math.radians(136) / 300   # degrees offset from straight on per pixel offset
 
         def calibrate(self, object_detector, camera):
             """
@@ -151,6 +153,12 @@ class PositionDetector:
             """Return the height of the detection on the sensor in cm"""
             height_pixels = detection[1]['y1'] - detection[1]['y2']
             return self.PIXEL_SIZE * height_pixels
+
+        def get_offset_from_center(self, detection):
+            """Return the number of pixels detection is offset from center. Positive = right/ negative = left"""
+            width_pixels = detection[1]['x1'] - detection[1]['x2']
+            obj_center = detection[1]['x1'] - width_pixels/2
+            return obj_center - 150
 
         def detect_landmarks(self, detections):
             """
@@ -186,6 +194,14 @@ class PositionDetector:
             d_cm = landmark.height * self.FOCAL_LENGTH / height_on_sensor_cm
 
             return d_cm / 100   # convert to meters
+
+        def get_angle_offset_to_landmark(self, detection):
+            """
+            Get the angle offset from the direction the robot is looking to the object
+            :param detection: object detection returned from jetbot Object Detector
+            :return: offset (radians). Positive = right, Negative = left
+            """
+            return self.get_offset_from_center(detection) * self.RAD_PER_PIXEL
 
     class PositionLocater():
         # Number of landmarks position estimate is based off of
@@ -300,3 +316,47 @@ class PositionDetector:
 
             center = numpy.mean(list(coords), axis=0)
             return tuple(center), self.CONFIDENCE_2LM if most_rings == 2 else self.CONFIDENCE_3LM
+
+        def get_orientation_from_landmarks(self, landmark_thetas, position):
+            """
+            Find the orientation from the detected landmarks and detected position
+            :param landmark_dists: list of tuples containing a landmark and the robot's orientation offset from the landmark
+            :param position: (x,y) position returned from get_position_from_landmarks()
+            :return: global orientation (theta) in radians
+            """
+            def get_theta_to_obj(landmark):
+                """use position to determine the global rotation to see the object head on"""
+                dy = position[1] - landmark.position[1]
+                dx = position[0] - landmark.position[0]
+                theta = math.atan(dy/dx)
+
+                if dy >= 0:
+                    if dx >= 0:
+                        return math.pi/2 - theta    # Q1
+                    else:
+                        return 3*math.pi/2 + theta    # Q2
+
+                else:
+                    if dx >= 0:
+                        return math.pi/2 + theta    # Q4
+                    else:
+                        return 3*math.pi/2 - theta    # Q3
+
+
+            global_thetas = []
+            for landmark, theta in landmark_thetas:
+                # compute global thenta to landmark (observed theta looking North)
+                landmark_global_theta = get_theta_to_obj(landmark)
+
+                global_thetas.append(landmark_global_theta - theta)     # global - offset
+
+            # remove outliers
+            g_avg = float(numpy.mean(global_thetas))
+            g_std = float(numpy.std(global_thetas))
+            for val in global_thetas:
+                z = (val - g_avg) / g_std
+                if abs(z) > 2:      # try to remove bad readings (false positive detections)
+                    global_thetas.remove(val)
+
+            # average
+            return float(numpy.mean(global_thetas))
