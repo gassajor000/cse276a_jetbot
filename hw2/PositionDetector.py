@@ -94,24 +94,68 @@ class PositionDetector:
         return self.filter.x
 
     class LandmarkDetector():
+        class Landmark():
+            def __init__(self, position, height, name, category, label):
+                self.label = label
+                self.name = name
+                self.category = category
+                self.height = height    # cm
+                self.position = position
+
         # Landmark positions & classes
-        LANDMARKS = {'landmark1': (0,0), 'landmark2': (0,0), 'landmark3': (0,0), 'landmark4': (0,0)}
+        LANDMARKS = {0: Landmark((0,0), 0, 'landmark0', 'lmk', 0), 1: Landmark((0,0), 0, 'landmark1', 'lmk', 1),
+                     2: Landmark((0,0), 0, 'landmark2', 'lmk', 2), 3: Landmark((0,0), 0, 'landmark3', 'lmk', 3)}
 
         CAMERA_OFFSET = 2.0  # cm between the camera and the position model point
+        FOCAL_LENGTH = .0315     # 3.15 cm
+        PIXEL_SIZE = 0.000112   # 1.12 um /pixel
 
-        def calibrate(self):
+        def calibrate(self, object_detector, camera):
             """
-            for each landmark, measure bounding box at 0.1, 0.5, 1.0, 1.5, and 2.0 meters
+            For each landmark, measure bounding box at 0.1, 0.5, 1.0, 1.5, and 2.0 meters
             print results to screen for computation
             """
+            def get_focal_length():
+                return d * height_on_sensor_cm / lmk[0].height
 
-        def detect_landmarks(self):
-            """
-            Return a list of all landmarks currently visible
-            """
-            # TODO use current position / orientation to eliminate false positives?
+            lmk = self.LANDMARKS[0]
+            focal_lengths = []
+            for d in [0.1, 0.5, 1.0, 1.5, 2.0]:
+                input("Place Landmark 0 {:.2f}m from robot then press any key to continue".format(d))
 
-        def get_landmark(self, detection):
+                detections = object_detector(camera.value)
+                landmarks = self.detect_landmarks(detections)
+                lmk = landmarks.get(0)
+                f = []
+
+                if lmk is None:
+                    raise RuntimeError('Landmark 0 was not detected')
+
+                height_on_sensor_cm = self.get_height_on_sensor(lmk[1])
+                focal_lengths.append(get_focal_length())
+
+            f = float(numpy.mean(focal_lengths))
+            print('Average focal length = {:.3f}'.format(f))
+            self.FOCAL_LENGTH = f
+
+        def get_height_on_sensor(self, detection):
+            """Return the height of the detection on the sensor in cm"""
+            height_pixels = detection[1]['y1'] - detection[1]['y2']
+            return self.PIXEL_SIZE * height_pixels
+
+        def detect_landmarks(self, detections):
+            """
+            Return a list of all landmarks currently visible, paired with the detection data, keyed by the landmark label
+            """
+            landmarks = {}
+            for det in detections:
+                lmk = self._get_landmark(det)
+                if lmk is not None:
+                    landmarks[lmk.label] = ((lmk, det))
+
+            return landmarks
+
+        def _get_landmark(self, detection):
             """
             returns the landmark corresponding to the object detected.
             Returns None if object does not match any landmarks
@@ -120,14 +164,19 @@ class PositionDetector:
             """
             return self.LANDMARKS.get(detection['label'], None)
 
-        def get_distance_to_landmark(self, landmark, detection):
+        def get_distance_to_landmark(self, landmark: Landmark, detection):
             """
             :param landmark: one of the landmarks in self.LANDMARKS
             :param detection: object detection returned from jetbot Object Detector
-            :return: the estimated distance to landmark
+            :return: the estimated distance to landmark (in meters)
             """
-            # Compute height in pixels
+
+            height_on_sensor_cm = self.get_height_on_sensor(detection)
+
             # Use similar triangles to estimate distance
+            d_cm = landmark.height * self.FOCAL_LENGTH / height_on_sensor_cm
+
+            return d_cm / 100   # convert to meters
 
     class PositionLocater():
         # Number of landmarks position estimate is based off of
