@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     # W = WallE()
     # W.calibrate()
-    from hw2.PositionDetector import PositionDetector
+    from PositionDetector import PositionDetector
 
     p = PositionDetector()
     input('press any key to start sequence')

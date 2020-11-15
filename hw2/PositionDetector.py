@@ -4,6 +4,8 @@
 """
 import math
 import random
+import subprocess
+import uuid
 
 from filterpy.kalman import KalmanFilter
 import numpy
@@ -81,8 +83,8 @@ class PositionDetector:
         self.camera = Camera.instance(width=300, height=300)
 
         # TODO camera calibration
-
-    def calibrate(self):
+    def calibrate_camera(self):
+        """Run camera calibration on captured images"""
         print('Beginning Camera Calibration')
         # camera calibration
         # termination criteria
@@ -120,6 +122,19 @@ class PositionDetector:
         self.mtx = mtx
         print('Camera Matrix ', mtx)
 
+    def calibrate(self):
+        """Calibrate capture images, calibrate camera, calibrate detector"""
+        def save_image(image):
+            file_path = 'snapshots/' + str(uuid.uuid1()) + '.jpg'
+            with open(file_path, 'wb') as f:
+                f.write(image)
+
+        subprocess.call(['mkdir', '-p', 'images'])
+        for _ in range(5):
+            input('Move robot to a new position. Press any key to continue.')
+            save_image(self.camera.value)
+
+        self.calibrate_camera()
         self.detector.calibrate(self.model, self.camera)
 
     def _make_B_vector(self):

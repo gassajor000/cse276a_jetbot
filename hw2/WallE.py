@@ -6,7 +6,7 @@ import time
 import math
 
 import jetbot
-from hw2.PositionModel import PositionModel
+from PositionModel import PositionModel
 
 
 class WallE:
