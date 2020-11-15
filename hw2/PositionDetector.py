@@ -83,6 +83,7 @@ class PositionDetector:
         # TODO camera calibration
 
     def calibrate(self):
+        print('Beginning Camera Calibration')
         # camera calibration
         # termination criteria
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -117,6 +118,9 @@ class PositionDetector:
                 cv2.waitKey(500)
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
         self.mtx = mtx
+        print('Camera Matrix ', mtx)
+
+        self.detector.calibrate(self.model, self.camera)
 
     def _make_B_vector(self):
         return numpy.array([
@@ -179,6 +183,7 @@ class PositionDetector:
             def get_focal_length():
                 return d * height_on_sensor_cm / lmk[0].height
 
+            print('Beginning LandmarkDetector Calibration')
             lmk = self.LANDMARKS[0]
             focal_lengths = []
             for d in [0.1, 0.5, 1.0, 1.5, 2.0]:

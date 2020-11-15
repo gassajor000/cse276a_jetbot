@@ -36,5 +36,5 @@ if __name__ == '__main__':
     # time.sleep(1)
     # W.drive_to(-2, 1, 0)
 
-    drive_to_waypoints(W)
+    # drive_to_waypoints(W)
 
