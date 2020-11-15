@@ -20,16 +20,35 @@ def drive_to_waypoints(walle):
         walle.drive_to(x, y, theta)
         time.sleep(1)
 
+def take_images():
+    def save_image(image):
+        import uuid
+        file_path = 'snapshots/' + str(uuid.uuid1()) + '.jpg'
+        with open(file_path, 'wb') as f:
+            f.write(image)
+
+    from jetbot import Camera
+    camera = Camera.instance(width=300, height=300)
+
+    import subprocess
+    subprocess.call(['mkdir', '-p', 'images'])
+    for _ in range(5):
+        input('Move robot to a new position. Press any key to continue.')
+        save_image(camera.value)
+
+
 if __name__ == '__main__':
+    take_images()
+
+    # from PositionDetector import PositionDetector
+    #
+    # p = PositionDetector()
+    # input('press any key to start sequence')
+    # p.detector.calibrate(p.model, p.camera)
 
 
     # W = WallE()
     # W.calibrate()
-    from PositionDetector import PositionDetector
-
-    p = PositionDetector()
-    input('press any key to start sequence')
-    p.detector.calibrate(p.model, p.camera)
     # W.drive_to(-1, 0, 0)
     # time.sleep(1)
     # W.drive_to(-1, 1, 1.57)
