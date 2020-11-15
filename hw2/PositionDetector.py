@@ -83,7 +83,7 @@ class PositionDetector:
         self.camera = Camera.instance(width=300, height=300)
 
         # TODO camera calibration
-    def calibrate_camera(self):
+    def calibrate_camera(self, file_path):
         """Run camera calibration on captured images"""
         print('Beginning Camera Calibration')
         # camera calibration
@@ -98,7 +98,7 @@ class PositionDetector:
         objpoints = []  # 3d point in real world space
         imgpoints = []  # 2d points in image plane.
 
-        images = glob.glob('images/*.jpg')
+        images = glob.glob(file_path + '*.jpg')
         gray = None
         for fname in images:
             img = cv2.imread(fname)
@@ -122,19 +122,9 @@ class PositionDetector:
         self.mtx = mtx
         print('Camera Matrix ', mtx)
 
-    def calibrate(self):
+    def calibrate(self, file_path='images/'):
         """Calibrate capture images, calibrate camera, calibrate detector"""
-        def save_image(image):
-            file_path = 'images/' + str(uuid.uuid1()) + '.jpg'
-            with open(file_path, 'wb') as f:
-                f.write(image)
-
-        subprocess.call(['mkdir', '-p', 'images'])
-        for _ in range(5):
-            input('Move robot to a new position. Press any key to continue.')
-            save_image(bgr8_to_jpeg(self.camera.value))
-
-        self.calibrate_camera()
+        self.calibrate_camera(file_path)
         self.detector.calibrate(self.model, self.camera)
 
     def _make_B_vector(self):
@@ -166,9 +156,9 @@ class PositionDetector:
 
         # measure location using camera
         detections = self.model(dst)
-        z = self.locator.get_position_from_landmarks(self.detector.detect_landmarks(detections), tuple(self.filter.x))
-        # todo measure orientation
-        self.filter.update(z=z)
+        x1, y1 = self.locator.get_position_from_landmarks(self.detector.detect_landmarks(detections), tuple(self.filter.x))
+        theta = None    # TODO get orientation
+        self.filter.update(z=(x1, y1, theta))
 
         return self.filter.x
 
