@@ -40,14 +40,13 @@ def take_images():
 
 
 if __name__ == '__main__':
-    take_images()
+    # take_images()
 
-    # from PositionDetector import PositionDetector
-    #
-    # p = PositionDetector()
-    # input('press any key to start sequence')
-    # p.detector.calibrate(p.model, p.camera)
+    from PositionDetector import PositionDetector
 
+    p = PositionDetector()
+    p.calibrate()
+    p.close()
 
     # W = WallE()
     # W.calibrate()

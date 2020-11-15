@@ -127,6 +127,10 @@ class PositionDetector:
         self.calibrate_camera(file_path)
         self.detector.calibrate(self.model, self.camera)
 
+    def close(self):
+        """Clean up resources and extra threads"""
+        self.camera.close()
+
     def _make_B_vector(self):
         return numpy.array([
             [numpy.cos(self.filter.x[2]), 0.],
