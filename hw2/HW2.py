@@ -45,8 +45,10 @@ if __name__ == '__main__':
     from PositionDetector import PositionDetector
 
     p = PositionDetector()
-    p.calibrate()
-    p.close()
+    try:
+        p.calibrate()
+    finally:
+        p.close()
 
     # W = WallE()
     # W.calibrate()

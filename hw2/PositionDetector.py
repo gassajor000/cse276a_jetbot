@@ -25,7 +25,7 @@ class PositionDetector:
     MEASUREMENT_NOISE = 0.05     # Assume distance measurements are +/- 5 cm
     ESTIMATION_PROXIMITY = 0.25  # Bias position readings to within 25cm of predicted position
 
-    def __init__(self, init_pos=(0.0, 0.0, 0.0)):
+    def __init__(self, init_pos=(0.0, 0.0, 0.0), model_path='/home/jetbot/Notebooks/object_following/'):
         """
 
         Initialize camera, object detection and Kalman Fiilter
@@ -79,7 +79,7 @@ class PositionDetector:
         self.locator = self.PositionLocater(self.MEASUREMENT_NOISE, self.ESTIMATION_PROXIMITY)
 
         # Setup camera & object detection
-        self.model = ObjectDetector('ssd_mobilenet_v2_coco.engine')
+        self.model = ObjectDetector(model_path + 'ssd_mobilenet_v2_coco.engine')
         self.camera = Camera.instance(width=300, height=300)
 
         # TODO camera calibration
@@ -91,8 +91,8 @@ class PositionDetector:
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
         # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-        objp = numpy.zeros((6 * 7, 3), numpy.float32)
-        objp[:, :2] = numpy.mgrid[0:7, 0:6].T.reshape(-1, 2)
+        objp = numpy.zeros((6 * 9, 3), numpy.float32)
+        objp[:, :2] = numpy.mgrid[0:9, 0:6].T.reshape(-1, 2)
 
         # Arrays to store object points and image points from all the images.
         objpoints = []  # 3d point in real world space
@@ -101,12 +101,13 @@ class PositionDetector:
         images = glob.glob(file_path + '*.jpg')
         gray = None
         for fname in images:
+            print('Processing Image ' + fname)
             img = cv2.imread(fname)
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
             # Find the chess board corners
-            ret, corners = cv2.findChessboardCorners(gray, (7, 6), None)
-
+            ret, corners = cv2.findChessboardCorners(gray, (6, 9), None)
+            print('found ret {}'.format(ret, corners))
             # If found, add object points, image points (after refining them)
             if ret == True:
                 objpoints.append(objp)
@@ -115,9 +116,9 @@ class PositionDetector:
                 imgpoints.append(corners2)
 
                 # Draw and display the corners
-                img = cv2.drawChessboardCorners(img, (7, 6), corners2, ret)
-                cv2.imshow('img', img)
-                cv2.waitKey(500)
+                img = cv2.drawChessboardCorners(img, (6, 9), corners2, ret)
+                cv2.imwrite(fname + '_processed.jpg', img)
+        print("obj size {}, img size {}".format(len(objpoints), len(imgpoints)))
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
         self.mtx = mtx
         print('Camera Matrix ', mtx)
@@ -129,7 +130,7 @@ class PositionDetector:
 
     def close(self):
         """Clean up resources and extra threads"""
-        self.camera.close()
+        self.camera.stop()
 
     def _make_B_vector(self):
         return numpy.array([
