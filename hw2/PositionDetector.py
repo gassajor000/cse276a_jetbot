@@ -123,6 +123,8 @@ class PositionDetector:
         self.mtx = mtx
         print('Camera Matrix ', mtx)
 
+        self.undistort_image(cv2.imread(images[0]))
+
     def calibrate(self, file_path='images/'):
         """Calibrate capture images, calibrate camera, calibrate detector"""
         self.calibrate_camera(file_path)
@@ -139,6 +141,19 @@ class PositionDetector:
             [0., 1.]
         ])
 
+    def undistort_image(self, image):
+        """undistort the image using the calibrated camera matrix"""
+        h, w = image.shape[:2]
+        newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.mtx, dist, (w, h), 1, (w, h))
+        mapx, mapy = cv2.initUndistortRectifyMap(self.mtx, dist, None, newcameramtx, (w, h), 5)
+        dst = cv2.remap(image, mapx, mapy, cv2.INTER_LINEAR)
+
+        # crop the image
+        x, y, w, h = roi
+        dst = dst[y:y + h, x:x + w]
+        cv2.imwrite('images/calibresult.png', dst)
+        return dst
+
     def get_position(self, distance, rotation):
         """
         Get the estimated position of the robot
@@ -148,19 +163,10 @@ class PositionDetector:
         self.filter.predict(u=numpy.array([distance, rotation]), B=self._make_B_vector())
 
         # undistort image
-        img = cv2.imread('left12.jpg')
-        h, w = img.shape[:2]
-        newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.mtx, dist, (w, h), 1, (w, h))
-        mapx, mapy = cv2.initUndistortRectifyMap(self.mtx, dist, None, newcameramtx, (w, h), 5)
-        dst = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR)
-
-        # crop the image
-        x, y, w, h = roi
-        dst = dst[y:y + h, x:x + w]
-        cv2.imwrite('calibresult.png', dst)
+        image = self.undistort_image(bgr8_to_jpeg(self.camera.value))
 
         # measure location using camera
-        detections = self.model(dst)
+        detections = self.model(image)
         x1, y1 = self.locator.get_position_from_landmarks(self.detector.detect_landmarks(detections), tuple(self.filter.x))
         theta = None    # TODO get orientation
         self.filter.update(z=(x1, y1, theta))
@@ -202,7 +208,6 @@ class PositionDetector:
                 detections = object_detector(camera.value)
                 landmarks = self.detect_landmarks(detections)
                 lmk = landmarks.get(0)
-                f = []
 
                 if lmk is None:
                     raise RuntimeError('Landmark 0 was not detected')
