@@ -23,18 +23,20 @@ def drive_to_waypoints(walle):
 def take_images():
     def save_image(image):
         import uuid
-        file_path = 'snapshots/' + str(uuid.uuid1()) + '.jpg'
+        file_path = 'images/' + str(uuid.uuid1()) + '.jpg'
         with open(file_path, 'wb') as f:
             f.write(image)
 
-    from jetbot import Camera
+    from jetbot import Camera, bgr8_to_jpeg
     camera = Camera.instance(width=300, height=300)
 
     import subprocess
     subprocess.call(['mkdir', '-p', 'images'])
     for _ in range(5):
         input('Move robot to a new position. Press any key to continue.')
-        save_image(camera.value)
+        save_image(bgr8_to_jpeg(camera.value))
+
+    camera.stop()
 
 
 if __name__ == '__main__':

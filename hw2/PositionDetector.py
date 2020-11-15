@@ -12,7 +12,7 @@ import numpy
 import cv2
 import glob
 
-from jetbot import ObjectDetector, Camera
+from jetbot import ObjectDetector, Camera, bgr8_to_jpeg
 
 
 def dist(x1, y1, x2, y2):
@@ -125,14 +125,14 @@ class PositionDetector:
     def calibrate(self):
         """Calibrate capture images, calibrate camera, calibrate detector"""
         def save_image(image):
-            file_path = 'snapshots/' + str(uuid.uuid1()) + '.jpg'
+            file_path = 'images/' + str(uuid.uuid1()) + '.jpg'
             with open(file_path, 'wb') as f:
                 f.write(image)
 
         subprocess.call(['mkdir', '-p', 'images'])
         for _ in range(5):
             input('Move robot to a new position. Press any key to continue.')
-            save_image(self.camera.value)
+            save_image(bgr8_to_jpeg(self.camera.value))
 
         self.calibrate_camera()
         self.detector.calibrate(self.model, self.camera)
