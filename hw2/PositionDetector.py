@@ -98,7 +98,7 @@ class PositionDetector:
         objpoints = []  # 3d point in real world space
         imgpoints = []  # 2d points in image plane.
 
-        images = glob.glob('*.jpg')
+        images = glob.glob('images/*.jpg')
         gray = None
         for fname in images:
             img = cv2.imread(fname)
