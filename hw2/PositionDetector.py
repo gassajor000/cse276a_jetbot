@@ -121,7 +121,9 @@ class PositionDetector:
         print("obj size {}, img size {}".format(len(objpoints), len(imgpoints)))
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
         self.mtx = mtx
+        self.dist = dist
         print('Camera Matrix ', mtx)
+        print('Distortion ', dist)
 
         self.undistort_image(cv2.imread(images[0]))
 
@@ -144,7 +146,7 @@ class PositionDetector:
     def undistort_image(self, image):
         """undistort the image using the calibrated camera matrix"""
         h, w = image.shape[:2]
-        newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.mtx, dist, (w, h), 1, (w, h))
+        newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.mtx, self.dist, (w, h), 1, (w, h))
         mapx, mapy = cv2.initUndistortRectifyMap(self.mtx, dist, None, newcameramtx, (w, h), 5)
         dst = cv2.remap(image, mapx, mapy, cv2.INTER_LINEAR)
 
