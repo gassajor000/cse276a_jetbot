@@ -82,7 +82,11 @@ class PositionDetector:
         self.model = ObjectDetector(model_path + 'ssd_mobilenet_v2_coco.engine')
         self.camera = Camera.instance(width=300, height=300)
 
-        # TODO camera calibration
+        self.mtx = [[369.09432263,   0.,         153.06911056],
+                    [  0.,         592.39571459, 153.86106711],
+                    [  0.,           0.,           1.,        ]]
+        self.dist = [[-2.50853423,  6.30981973, -0.03309406,  0.01974386, -8.89580458]]
+
     def calibrate_camera(self, file_path):
         """Run camera calibration on captured images"""
         print('Beginning Camera Calibration')
@@ -116,8 +120,8 @@ class PositionDetector:
                 imgpoints.append(corners2)
 
                 # Draw and display the corners
-                img = cv2.drawChessboardCorners(img, (6, 9), corners2, ret)
-                cv2.imwrite(fname + '_processed.jpg', img)
+                # img = cv2.drawChessboardCorners(img, (6, 9), corners2, ret)
+                # cv2.imwrite(fname + '_processed.jpg', img)
         print("obj size {}, img size {}".format(len(objpoints), len(imgpoints)))
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
         self.mtx = mtx
@@ -147,7 +151,7 @@ class PositionDetector:
         """undistort the image using the calibrated camera matrix"""
         h, w = image.shape[:2]
         newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.mtx, self.dist, (w, h), 1, (w, h))
-        mapx, mapy = cv2.initUndistortRectifyMap(self.mtx, dist, None, newcameramtx, (w, h), 5)
+        mapx, mapy = cv2.initUndistortRectifyMap(self.mtx, self.dist, None, newcameramtx, (w, h), 5)
         dst = cv2.remap(image, mapx, mapy, cv2.INTER_LINEAR)
 
         # crop the image
