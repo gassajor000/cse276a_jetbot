@@ -6,7 +6,8 @@ import time
 import math
 
 import jetbot
-from PositionModel import PositionModel
+from .PositionModel import PositionModel
+from .PositionDetector import PositionDetector
 
 
 class WallE:
@@ -17,6 +18,7 @@ class WallE:
         self.robot = jetbot.robot.Robot()
         self.position = PositionModel()
         self.movement = self.MovementModel()
+        self.locator = PositionDetector()
 
     def drive_to(self, x, y, theta):
         """
@@ -83,13 +85,14 @@ class WallE:
         # update movement model
         self.movement.calibrate(d/100.0, math.radians(t))
 
-        # TODO add camera calibration
+        self.locator.calibrate()
 
     def _turn_to_theta(self, theta):
         """turn to absolute orientation theta"""
         delta = self.position.get_rel_angle_to(theta)
         t_rotate = self.movement.get_rotation_time(delta)
-        self.position.rotate_clockwise(delta)
+        new_pos = self.locator.get_position(0.0, delta)
+        self.position.set_position(**new_pos)
 
         self._right()
         time.sleep(t_rotate)
@@ -98,7 +101,8 @@ class WallE:
     def _drive(self, distance):
         """drive distance forward"""
         t_drive = self.movement.get_drive_duration(distance)
-        self.position.move_forward(distance)
+        new_pos = self.locator.get_position(distance, 0.0)
+        self.position.set_position(**new_pos)
 
         self._forward()
         time.sleep(t_drive)

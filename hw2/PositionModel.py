@@ -23,7 +23,12 @@ class PositionModel():
 
     def get_position(self):
         """:returns current position and orientation"""
-        return (self.x, self.y, self.theta)
+        return self.x, self.y, self.theta
+
+    def set_position(self, x, y, theta):
+        self.x = x
+        self.y = y
+        self.theta = theta
 
     def get_distance_to(self, x, y):
         """returns the distance from the current position to the specified point"""
