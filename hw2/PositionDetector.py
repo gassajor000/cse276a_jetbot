@@ -25,6 +25,10 @@ class PositionDetector:
     MEASUREMENT_NOISE = 0.05     # Assume distance measurements are +/- 5 cm
     ESTIMATION_PROXIMITY = 0.25  # Bias position readings to within 25cm of predicted position
 
+    # Default values for camera distortion
+    DEFAULT_K = numpy.array([[214.05845570547808, 0.0, 255.25675781039644], [0.0, 284.53810048172056, 238.31815534760784], [0.0, 0.0, 1.0]])
+    DEFAULT_D = numpy.array([[-0.050587223195120365], [0.10843192238900058], [-0.11072191472804552], [0.006198532066253573]])
+
     def __init__(self, init_pos=(0.0, 0.0, 0.0), model_path='/home/jetbot/Notebooks/object_following/'):
         """
 
@@ -82,7 +86,10 @@ class PositionDetector:
         self.model = ObjectDetector(model_path + 'ssd_mobilenet_v2_coco.engine')
         self.camera = Camera.instance(width=300, height=300)
 
-        # TODO camera calibration
+        self.K = self.DEFAULT_K
+        self.D = self.DEFAULT_D
+
+
     def calibrate_camera(self, file_path):
         """Run camera calibration on captured images"""
         print('Beginning Camera Calibration')
