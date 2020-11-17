@@ -181,8 +181,12 @@ class PositionDetector:
 
         # measure location using camera
         detections = self.model(image)
-        x1, y1 = self.locator.get_position_from_landmarks(self.detector.detect_landmarks(detections), tuple(self.filter.x))
-        theta = None    # TODO get orientation
+        landmark_detections = self.detector.detect_landmarks(detections)
+        landmark_distances = list(map(lambda lmk: self.detector.get_distance_to_landmark(**lmk), landmark_detections))
+        landmark_angles = list(map(lambda lmk: self.detector.get_angle_offset_to_landmark(**lmk), landmark_detections))
+
+        x1, y1 = self.locator.get_position_from_landmarks(landmark_distances, tuple(self.filter.x))
+        theta = self.locator.get_orientation_from_landmarks(landmark_angles, tuple(self.filter.x))
         self.filter.update(z=(x1, y1, theta))
 
         return self.filter.x
