@@ -14,6 +14,9 @@ class WallE:
     SPEED_LEFT = 0.5
     SPEED_RIGHT = 0.515
 
+    ERROR_THETA = math.radians(10)  # 10 deg
+    ERROR_DISTANCE = 0.1    # 10 cm
+
     def __init__(self):
         self.robot = jetbot.robot.Robot()
         self.position = PositionModel()
@@ -36,20 +39,27 @@ class WallE:
             turn to theta
             evaluate position.theta
         """
+        while not self._is_at_position(x, y):
+            # get angle to rotate towards x, y
+            theta_drive = self.position.get_abs_angle_to(x, y)
+            while not self._is_oriented_towards(theta_drive):
+                # rotate towards x,y
+                self._turn_to_theta(theta_drive)
 
-
-        # get angle to rotate towards x, y
-        theta_drive = self.position.get_abs_angle_to(x, y)
-        # rotate towards x,y
-        self._turn_to_theta(theta_drive)
-
-        # get distance to x, y
-        dist = self.position.get_distance_to(x, y)
-        # drive forward to x, y
-        self._drive(dist)
+            # get distance to x, y
+            dist = self.position.get_distance_to(x, y)
+            # drive forward to x, y
+            self._drive(dist)
 
         # rotate to theta
-        self._turn_to_theta(theta)
+        while not self._is_oriented_towards(theta):
+            self._turn_to_theta(theta)
+
+    def _is_oriented_towards(self, desired_theta):
+        return abs(self.position.theta - desired_theta) < self.ERROR_THETA
+
+    def _is_at_position(self, x, y):
+        return self.position.get_distance_to(x, y) < self.ERROR_DISTANCE
 
     def calibrate(self):
         # calibrate left and right speeds
