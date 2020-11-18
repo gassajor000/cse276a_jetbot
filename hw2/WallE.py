@@ -6,8 +6,8 @@ import time
 import math
 
 import jetbot
-from .PositionModel import PositionModel
-from .PositionDetector import PositionDetector
+from PositionModel import PositionModel
+from PositionDetector import PositionDetector
 
 
 class WallE:

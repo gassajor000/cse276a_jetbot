@@ -26,10 +26,10 @@ class PositionDetector:
     ESTIMATION_PROXIMITY = 0.25  # Bias position readings to within 25cm of predicted position
 
     # Default values for camera distortion
-    DEFAULT_K = numpy.array([[214.05845570547808, 0.0, 255.25675781039644], [0.0, 284.53810048172056, 238.31815534760784], [0.0, 0.0, 1.0]])
-    DEFAULT_D = numpy.array([[-0.050587223195120365], [0.10843192238900058], [-0.11072191472804552], [0.006198532066253573]])
+    DEFAULT_K = numpy.array([[121.72388176606911, 0.0, 152.47287927762537], [0.0, 161.6329164473156, 142.225856754917], [0.0, 0.0, 1.0]])
+    DEFAULT_D = numpy.array([[0.05000918770713665], [-0.16688048742835998], [0.24973285586862118], [-0.14173811443102421]])
 
-    def __init__(self, init_pos=(0.0, 0.0, 0.0), model_path='/home/jetbot/Notebooks/object_following/'):
+    def __init__(self, init_pos=(0.0, 0.0, 0.0), model_path='/home/jetbot/Notebooks/object_following/', model=None, camera=None):
         """
 
         Initialize camera, object detection and Kalman Fiilter
@@ -83,8 +83,16 @@ class PositionDetector:
         self.locator = self.PositionLocater(self.MEASUREMENT_NOISE, self.ESTIMATION_PROXIMITY)
 
         # Setup camera & object detection
-        self.model = ObjectDetector(model_path + 'ssd_mobilenet_v2_coco.engine')
-        self.camera = Camera.instance(width=300, height=300)
+        if model:
+            self.model = model
+        else:
+            print("Initializing Model...")
+            self.model = ObjectDetector(model_path + 'ssd_mobilenet_v2_coco.engine')
+        if camera:
+            self.camera = camera
+        else:
+            print("Initializing Camera...")
+            self.camera = Camera.instance(width=300, height=300)
 
         self.K = self.DEFAULT_K
         self.D = self.DEFAULT_D
@@ -117,6 +125,9 @@ class PositionDetector:
                 objpoints.append(objp)
                 cv2.cornerSubPix(gray,corners,(3,3),(-1,-1),subpix_criteria)
                 imgpoints.append(corners)
+
+                img = cv2.drawChessboardCorners(img, CHECKERBOARD, corners, ret)
+                cv2.imwrite(fname + '-processed.png', img)
 
         N_OK = len(objpoints)
         K = numpy.zeros((3, 3))
@@ -160,12 +171,19 @@ class PositionDetector:
             [0., 1.]
         ])
 
+    def correct_images(self):
+        images = glob.glob('images/*.jpg')
+        for fname in images:
+            img = cv2.imread(fname)
+            img_corrected = self.undistort_image(img)
+            cv2.imwrite(fname + '-corrected.png', img_corrected)
+
     def undistort_image(self, image):
         """undistort the image using the calibrated camera matrix"""
         map1, map2 = cv2.fisheye.initUndistortRectifyMap(self.K, self.D, numpy.eye(3), self.K, image.shape[:2], cv2.CV_16SC2)
         undistorted_img = cv2.remap(image, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
 
-        # cv2.imwrite('images/calibresult.png', undistorted_img)
+#         cv2.imwrite('images/calibresult.png', undistorted_img)
         return undistorted_img
 
     def get_position(self, distance, rotation):
@@ -201,8 +219,8 @@ class PositionDetector:
                 self.position = position
 
         # Landmark positions & classes
-        LANDMARKS = {0: Landmark((0,0), 0, 'landmark0', 'lmk', 0), 1: Landmark((0,0), 0, 'landmark1', 'lmk', 1),
-                     2: Landmark((0,0), 0, 'landmark2', 'lmk', 2), 3: Landmark((0,0), 0, 'landmark3', 'lmk', 3)}
+        LANDMARKS = {44: Landmark((0,0), 20, 'landmark 0 [olive oil', 'bottle', 44), 53: Landmark((0,0), 7.5, 'landmark 1 [apple]', 'apple', 53),
+                     32: Landmark((0,0), 150, 'landmark 2 [tie]', 'tie', 32), 51: Landmark((0,0), 8.0, 'landmark 3 [bowl]', 'lmk', 51)}
 
         CAMERA_OFFSET = 2.0  # cm between the camera and the position model point
         FOCAL_LENGTH = .0315     # 3.15 cm
@@ -215,23 +233,35 @@ class PositionDetector:
             print results to screen for computation
             """
             def get_focal_length():
-                return d * height_on_sensor_cm / lmk[0].height
+                return d * height_on_sensor_cm / lmk.height
 
             print('Beginning LandmarkDetector Calibration')
-            lmk = self.LANDMARKS[0]
+            lmk = self.LANDMARKS[51]
             focal_lengths = []
-            for d in [0.1, 0.5, 1.0, 1.5, 2.0]:
-                input("Place Landmark 0 {:.2f}m from robot then press any key to continue".format(d))
+            for d in [0.25, 0.5, 1.0, 1.25]:
+                input("Place {} {:.2f}m from robot then press any key to continue".format(lmk.name, d))
 
-                detections = object_detector(camera.value)
-                landmarks = self.detect_landmarks(detections)
-                lmk = landmarks.get(0)
+                import time
+                timeout = 5
+                time_start = time.time()
+                lmks = None
+                while time.time() - time_start < timeout:
+                    detections = object_detector(camera.value)
+                    landmarks = self.detect_landmarks(detections[0])
+                    lmk1, det = landmarks.get(51, (None, None))
+                    if lmk1:
+                        break
+                    else:
+                        time.sleep(.02)
+                else:
+                    raise RuntimeError('{} was not detected'.format(lmk.name))
 
-                if lmk is None:
-                    raise RuntimeError('Landmark 0 was not detected')
+                print(lmk1)
+                height_on_sensor_cm = self.get_height_on_sensor(det)
+                f = get_focal_length()
+                print("height on sensor {}, f {}".format(height_on_sensor_cm, f))
+                focal_lengths.append(f)
 
-                height_on_sensor_cm = self.get_height_on_sensor(lmk[1])
-                focal_lengths.append(get_focal_length())
 
             f = float(numpy.mean(focal_lengths))
             print('Average focal length = {:.3f}'.format(f))
@@ -239,13 +269,15 @@ class PositionDetector:
 
         def get_height_on_sensor(self, detection):
             """Return the height of the detection on the sensor in cm"""
-            height_pixels = detection[1]['y1'] - detection[1]['y2']
+            x1, y1, x2, y2 = detection['bbox']
+            height_pixels = abs(y1 - y2)
             return self.PIXEL_SIZE * height_pixels
 
         def get_offset_from_center(self, detection):
             """Return the number of pixels detection is offset from center. Positive = right/ negative = left"""
-            width_pixels = detection[1]['x1'] - detection[1]['x2']
-            obj_center = detection[1]['x1'] - width_pixels/2
+            x1, y1, x2, y2 = detection['bbox']
+            width_pixels = abs(x1 - x2)
+            obj_center = x1 - width_pixels/2
             return obj_center - 150
 
         def detect_landmarks(self, detections):
