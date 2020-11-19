@@ -219,8 +219,12 @@ class PositionDetector:
                 self.position = position
 
         # Landmark positions & classes
-        LANDMARKS = {44: Landmark((0,0), 22.5, 'landmark 0 [olive oil]', 'bottle', 44), 53: Landmark((0,0), 7.5, 'landmark 1 [apple]', 'apple', 53),
-                     32: Landmark((0,0), 150, 'landmark 2 [tie]', 'tie', 32), 51: Landmark((0,0), 8.0, 'landmark 3 [bowl]', 'lmk', 51)}
+        LANDMARKS = {44: Landmark((0,0), 22.5, 'landmark 0 [olive oil]', 'bottle', 44),
+                     53: Landmark((0,0), 7.5, 'landmark 1 [apple]', 'apple', 53),
+                     32: Landmark((0,0), 150, 'landmark 2 [tie]', 'tie', 32),
+                     51: Landmark((0,0), 11.5, 'landmark 3 [bowl]', 'bowl', 51),
+                     13: Landmark((0,0), 23.0, 'landmark 4 [stop sign]', 'stop sign', 32),
+                     85: Landmark((0,0), 13.6, 'landmark 5 [clock]', 'clock', 85)}
 
         CAMERA_OFFSET = 2.0  # cm between the camera and the position model point
         FOCAL_LENGTH = .159     # 1.59 mm
@@ -271,14 +275,14 @@ class PositionDetector:
             """Return the height of the detection on the sensor in cm"""
             x1, y1, x2, y2 = detection['bbox']
             height_pixels = abs(y1 - y2) * 300    # Scale to height of image
-            # print("{} pixels high. bbox {}".format(height_pixels, detection['bbox']))
+#             print("{} pixels high. bbox {}".format(height_pixels, detection['bbox']))
             return self.PIXEL_SIZE * height_pixels
 
         def get_offset_from_center(self, detection):
             """Return the number of pixels detection is offset from center. Positive = right/ negative = left"""
             x1, y1, x2, y2 = detection['bbox']
-            width_pixels = abs(x1 - x2) * 300    # Scale to width of image
-            obj_center = x1 - width_pixels/2
+            obj_center = ((x1 + x2) / 2.0) * 300
+#             print(obj_center)
             return obj_center - 150
 
         def detect_landmarks(self, detections):
