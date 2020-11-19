@@ -4,7 +4,7 @@
 """
 import math
 import random
-import subprocess
+import time
 import uuid
 
 from filterpy.kalman import KalmanFilter
@@ -193,19 +193,34 @@ class PositionDetector:
         """
         # predict
         self.filter.predict(u=numpy.array([distance, rotation]), B=self._make_B_vector())
+        print("Predicted Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
-        # undistort image
-        image = self.undistort_image(bgr8_to_jpeg(self.camera.value))
 
-        # measure location using camera
-        detections = self.model(image)
-        landmark_detections = self.detector.detect_landmarks(detections)
+        start_time = time.time()
+        landmark_detections = None
+        while time.time() < start_time + 5: # 5second timeout
+            # undistort image
+            image = self.undistort_image(self.camera.value)
+            # measure location using camera
+            detections = self.model(image)
+            landmark_detections = self.detector.detect_landmarks(detections)
+
+            if len(landmark_detections) > 1:    # try to get more than 1 landmark
+                break
+            time.sleep(.02) # Wait for a bit before sampling again
+
+        if not landmark_detections:
+            return self.filter.x    # Couldn't find any landmarks. Just use the prediction.
+
         landmark_distances = list(map(lambda lmk: self.detector.get_distance_to_landmark(**lmk), landmark_detections))
         landmark_angles = list(map(lambda lmk: self.detector.get_angle_offset_to_landmark(**lmk), landmark_detections))
 
         x1, y1 = self.locator.get_position_from_landmarks(landmark_distances, tuple(self.filter.x))
         theta = self.locator.get_orientation_from_landmarks(landmark_angles, tuple(self.filter.x))
+        print("Computed Position ({:.3f}, {:.3f}, {:.3f})".format(x1, y1, theta))
+
         self.filter.update(z=(x1, y1, theta))
+        print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         return self.filter.x
 

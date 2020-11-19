@@ -104,7 +104,7 @@ def execute(change):
                             1)  # line type
 
                 cv2.putText(image_fixed, "{:.2f}deg".format(np.rad2deg(ang)),
-                            (int(width * bbox[0]), int(height * bbox[1]) + 80),
+                            (int(width * bbox[0]), int(height * bbox[1]) + 65),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.5,  # font scale
                             (255, 255, 255),  # font color
