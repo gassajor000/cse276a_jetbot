@@ -157,7 +157,7 @@ class PositionDetector:
 
     def calibrate(self, file_path='images/'):
         """Calibrate capture images, calibrate camera, calibrate detector"""
-        self.calibrate_camera(file_path)
+#         self.calibrate_camera(file_path)
         self.detector.calibrate(self.model, self.camera)
 
     def close(self):
@@ -219,12 +219,12 @@ class PositionDetector:
                 self.position = position
 
         # Landmark positions & classes
-        LANDMARKS = {44: Landmark((0,0), 20, 'landmark 0 [olive oil', 'bottle', 44), 53: Landmark((0,0), 7.5, 'landmark 1 [apple]', 'apple', 53),
+        LANDMARKS = {44: Landmark((0,0), 22.5, 'landmark 0 [olive oil]', 'bottle', 44), 53: Landmark((0,0), 7.5, 'landmark 1 [apple]', 'apple', 53),
                      32: Landmark((0,0), 150, 'landmark 2 [tie]', 'tie', 32), 51: Landmark((0,0), 8.0, 'landmark 3 [bowl]', 'lmk', 51)}
 
         CAMERA_OFFSET = 2.0  # cm between the camera and the position model point
-        FOCAL_LENGTH = .0315     # 3.15 cm
-        PIXEL_SIZE = 0.000112   # 1.12 um /pixel
+        FOCAL_LENGTH = .159     # 1.59 mm
+        PIXEL_SIZE = 0.0009199   # (cm) 9.199 um /pixel
         RAD_PER_PIXEL = math.radians(136) / 300   # degrees offset from straight on per pixel offset
 
         def calibrate(self, object_detector, camera):
@@ -233,10 +233,10 @@ class PositionDetector:
             print results to screen for computation
             """
             def get_focal_length():
-                return d * height_on_sensor_cm / lmk.height
+                return (d * 100) * height_on_sensor_cm / lmk.height
 
             print('Beginning LandmarkDetector Calibration')
-            lmk = self.LANDMARKS[51]
+            lmk = self.LANDMARKS[44]
             focal_lengths = []
             for d in [0.25, 0.5, 1.0, 1.25]:
                 input("Place {} {:.2f}m from robot then press any key to continue".format(lmk.name, d))
@@ -248,7 +248,7 @@ class PositionDetector:
                 while time.time() - time_start < timeout:
                     detections = object_detector(camera.value)
                     landmarks = self.detect_landmarks(detections[0])
-                    lmk1, det = landmarks.get(51, (None, None))
+                    lmk1, det = landmarks.get(lmk.label, (None, None))
                     if lmk1:
                         break
                     else:
@@ -270,13 +270,14 @@ class PositionDetector:
         def get_height_on_sensor(self, detection):
             """Return the height of the detection on the sensor in cm"""
             x1, y1, x2, y2 = detection['bbox']
-            height_pixels = abs(y1 - y2)
+            height_pixels = abs(y1 - y2) * 300    # Scale to height of image
+            # print("{} pixels high. bbox {}".format(height_pixels, detection['bbox']))
             return self.PIXEL_SIZE * height_pixels
 
         def get_offset_from_center(self, detection):
             """Return the number of pixels detection is offset from center. Positive = right/ negative = left"""
             x1, y1, x2, y2 = detection['bbox']
-            width_pixels = abs(x1 - x2)
+            width_pixels = abs(x1 - x2) * 300    # Scale to width of image
             obj_center = x1 - width_pixels/2
             return obj_center - 150
 
