@@ -6,30 +6,60 @@ import time
 import math
 
 import jetbot
+from PositionModel import PositionModel
+from PositionDetector import PositionDetector
 
 
 class WallE:
     SPEED_LEFT = 0.5
     SPEED_RIGHT = 0.515
 
+    ERROR_THETA = math.radians(10)  # 10 deg
+    ERROR_DISTANCE = 0.1    # 10 cm
+
     def __init__(self):
         self.robot = jetbot.robot.Robot()
-        self.position = self.PositionModel()
+        self.position = PositionModel()
         self.movement = self.MovementModel()
+        self.locator = PositionDetector()
 
     def drive_to(self, x, y, theta):
-        # get angle to rotate towards x, y
-        theta_drive = self.position.get_abs_angle_to(x, y)
-        # rotate towards x,y
-        self._turn_to_theta(theta_drive)
+        """
+        while not @ x,y:
+            while not theta_to_xy:
+                turn to x,y
+                evaluate position.theta
 
-        # get distance to x, y
-        dist = self.position.get_distance_to(x, y)
-        # drive forward to x, y
-        self._drive(dist)
+            while distance_traveled != dist:
+                drive fwd
+                evaluate x,y
+                evaluate distance_traveled
+
+        while not @ theta:
+            turn to theta
+            evaluate position.theta
+        """
+        while not self._is_at_position(x, y):
+            # get angle to rotate towards x, y
+            theta_drive = self.position.get_abs_angle_to(x, y)
+            while not self._is_oriented_towards(theta_drive):
+                # rotate towards x,y
+                self._turn_to_theta(theta_drive)
+
+            # get distance to x, y
+            dist = self.position.get_distance_to(x, y)
+            # drive forward to x, y
+            self._drive(dist)
 
         # rotate to theta
-        self._turn_to_theta(theta)
+        while not self._is_oriented_towards(theta):
+            self._turn_to_theta(theta)
+
+    def _is_oriented_towards(self, desired_theta):
+        return abs(self.position.theta - desired_theta) < self.ERROR_THETA
+
+    def _is_at_position(self, x, y):
+        return self.position.get_distance_to(x, y) < self.ERROR_DISTANCE
 
     def calibrate(self):
         # calibrate left and right speeds
@@ -65,11 +95,14 @@ class WallE:
         # update movement model
         self.movement.calibrate(d/100.0, math.radians(t))
 
+        self.locator.calibrate()
+
     def _turn_to_theta(self, theta):
         """turn to absolute orientation theta"""
         delta = self.position.get_rel_angle_to(theta)
         t_rotate = self.movement.get_rotation_time(delta)
-        self.position.rotate_clockwise(delta)
+        new_pos = self.locator.get_position(0.0, delta)
+        self.position.set_position(**new_pos)
 
         self._right()
         time.sleep(t_rotate)
@@ -78,7 +111,8 @@ class WallE:
     def _drive(self, distance):
         """drive distance forward"""
         t_drive = self.movement.get_drive_duration(distance)
-        self.position.move_forward(distance)
+        new_pos = self.locator.get_position(distance, 0.0)
+        self.position.set_position(**new_pos)
 
         self._forward()
         time.sleep(t_drive)
@@ -90,59 +124,6 @@ class WallE:
     def _right(self):
         self.robot.set_motors(self.SPEED_LEFT, -self.SPEED_RIGHT)
 
-    class PositionModel():
-        def __init__(self, x=0, y=0, theta=0):
-            self.x = x
-            self.y = y
-            self.theta = theta
-
-        # movement update functions
-        def move_forward(self, d):
-            """update position after driving forward d meters"""
-            self.x += d * math.sin(self.theta)
-            self.y += d * math.cos(self.theta)
-
-        def rotate_clockwise(self, theta):
-            """update position after rotating clockwise theta radians"""
-            self.theta = (self.theta + theta) % (2 * math.pi)
-
-        def get_position(self):
-            """:returns current position and orientation"""
-            return (self.x, self.y, self.theta)
-
-        def get_distance_to(self, x, y):
-            """returns the distance from the current position to the specified point"""
-            return math.sqrt((x - self.x)**2 + (y - self.y)**2)
-
-        def get_abs_angle_to(self, x, y):
-            """returns absolute angle between vertical at current position and x, y"""
-            if x >= self.x:
-                if y >= self.y:
-                    quadrant = 1
-                else:
-                    quadrant = 4
-            else:
-                if y >= self.y:
-                    quadrant = 2
-                else:
-                    quadrant = 3
-
-            if self.x == x:     # handle vertical case
-                return 0 if quadrant == 1 else math.pi
-
-            theta_horizontal = abs(math.atan((y - self.y)/ (x - self.x)))
-
-            adjustment = {1: lambda t: math.pi/2 - t,   # 90 deg - theta
-                          2: lambda t: 3*math.pi/2 + t, # 270 deg + theta
-                          3: lambda t: 3*math.pi/2 - t,    # 270 deg - theta
-                          4: lambda t: math.pi/2 + t }    # 90 deg + theta
-
-            return adjustment[quadrant](theta_horizontal)
-
-        def get_rel_angle_to(self, theta):
-            """returns clockwise offset between theta and current orientation"""
-            # t1 >= t0: t1 - t0, t0 > t1: (t0 - 2pi) + t1
-            return theta - self.theta if theta >= self.theta else (2 * math.pi) - self.theta + theta
 
     class MovementModel():
         # WHEEL_CIRCUMFERENCE = 21.5  # cm
