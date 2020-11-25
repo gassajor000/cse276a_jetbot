@@ -6,8 +6,10 @@ import time
 import math
 
 import jetbot
-from PositionModel import PositionModel
-from PositionDetector import PositionDetector
+from hw3.PositionModel import PositionModel
+from hw3.PositionDetector import PositionDetector
+
+from threading import Timer
 
 
 class WallE:
@@ -21,7 +23,13 @@ class WallE:
         self.robot = jetbot.robot.Robot()
         self.position = PositionModel()
         self.movement = self.MovementModel()
+        self.speed_right = 0.0
+        self.speed_left = 0.0
+
         self.locator = PositionDetector()
+        self.updateTimer = Timer(0.02, self.updatePosition)     # update position every 20 ms
+        self.updateTimer.start()
+
 
     def drive_to(self, x, y, theta):
         """
@@ -49,11 +57,42 @@ class WallE:
             # get distance to x, y
             dist = self.position.get_distance_to(x, y)
             # drive forward to x, y
-            self._drive(dist)
+            self._drive_distance(dist)
 
         # rotate to theta
         while not self._is_oriented_towards(theta):
             self._turn_to_theta(theta)
+
+    def _drive_to_continuous(self, x, y):
+        """
+        Drive to an (x, y) point assuming a current velocity and angular velocity.
+        Adjusts wheel speeds rather than explicitly turning/driving forward.
+        """
+        while not self._is_at_position(x, y):
+            # TODO
+            time.sleep(0.2)  # reevaluate every .2 sec
+
+    def drive_path(self, waypoints):
+        """
+        Drive a path passing through each of the waypoints
+        :param waypoints list of (x, y) coordinates
+        """
+        # turn towards first point and start driving
+        self._turn_to_theta(self.position.get_abs_angle_to(*waypoints[0]))
+        self._set_speed(self.SPEED_RIGHT, self.SPEED_LEFT)
+
+        for point in waypoints:
+            self._drive_to_continuous(*point)
+
+        self.robot.stop()
+
+    def updatePosition(self):
+        new_pos = self.locator.get_position(self.speed_left, self.speed_right)
+        self.position.set_position(**new_pos)
+
+    def close(self):
+        self.locator.close()
+        self.updateTimer.cancel()
 
     def _is_oriented_towards(self, desired_theta):
         return abs(self.position.theta - desired_theta) < self.ERROR_THETA
@@ -101,22 +140,26 @@ class WallE:
         """turn to absolute orientation theta"""
         delta = self.position.get_rel_angle_to(theta)
         t_rotate = self.movement.get_rotation_time(delta)
-        new_pos = self.locator.get_position(0.0, delta)
-        self.position.set_position(**new_pos)
 
         self._right()
         time.sleep(t_rotate)
         self.robot.stop()
 
-    def _drive(self, distance):
+    def _drive_distance(self, distance):
         """drive distance forward"""
         t_drive = self.movement.get_drive_duration(distance)
-        new_pos = self.locator.get_position(distance, 0.0)
-        self.position.set_position(**new_pos)
 
         self._forward()
         time.sleep(t_drive)
         self.robot.stop()
+
+    def _set_speed(self, speed_r, speed_l):
+        self.speed_right = speed_r
+        self.speed_left = speed_l
+        self._drive()
+
+    def _drive(self):
+        self.robot.set_motors(self.speed_left, self.speed_right)
 
     def _forward(self):
         self.robot.set_motors(self.SPEED_LEFT, self.SPEED_RIGHT)

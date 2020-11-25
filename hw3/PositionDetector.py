@@ -85,13 +85,13 @@ class PositionDetector:
             [0., 1.]
         ])
 
-    def get_position(self, distance, rotation):
+    def get_position(self, speed_l, speed_r):
         """
         Get the estimated position of the robot
-        :return: tuple (x, y, theta) position & orientation of the robot
+        :return: tuple (x, y, theta, v, omega) position, orientation, speed, and angular speed of the robot
         """
         # predict
-        self.filter.predict(u=numpy.array([distance, rotation]), B=self._make_B_vector())
+        self.filter.predict(u=numpy.array([speed_l, speed_r]), B=self._make_B_vector())
         print("Predicted Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         image = self.camera.get_image()
