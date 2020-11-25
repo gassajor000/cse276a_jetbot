@@ -20,6 +20,7 @@ def drive_to_waypoints(walle):
         walle.drive_to(x, y, theta)
         time.sleep(1)
 
+
 def take_images():
     def save_image(image):
         import uuid

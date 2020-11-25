@@ -2,8 +2,6 @@
     created by Jordan Gassaway, 11/10/2020
     PositionDetector: Uses the camera to detect the current position
 """
-import time
-
 from filterpy.kalman import KalmanFilter
 import numpy
 
@@ -20,7 +18,6 @@ class PositionDetector:
 
     def __init__(self, init_pos=(0.0, 0.0, 0.0), model=None, camera_instance=None):
         """
-
         Initialize camera, object detection and Kalman Fiilter
 
 
@@ -88,7 +85,6 @@ class PositionDetector:
             [0., 1.]
         ])
 
-
     def get_position(self, distance, rotation):
         """
         Get the estimated position of the robot
@@ -98,17 +94,8 @@ class PositionDetector:
         self.filter.predict(u=numpy.array([distance, rotation]), B=self._make_B_vector())
         print("Predicted Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
-
-        start_time = time.time()
-        landmark_detections = None
-        while time.time() < start_time + 5: # 5second timeout
-            # undistort image
-            image = self.camera.get_image()
-            landmark_detections = self.detector.detect_landmarks(image)
-
-            if len(landmark_detections) > 1:    # try to get more than 1 landmark
-                break
-            time.sleep(.02) # Wait for a bit before sampling again
+        image = self.camera.get_image()
+        landmark_detections = self.detector.detect_landmarks(image)
 
         if not landmark_detections:
             return self.filter.x    # Couldn't find any landmarks. Just use the prediction.

@@ -39,22 +39,22 @@ class LandmarkDetector():
 
     def calibrate(self, get_image_func):
         """
-        For each landmark, measure bounding box at 0.1, 0.5, 1.0, 1.5, and 2.0 meters
+        For each landmark, measure bounding box at 0.25, 0.5, 1.0, and 1.25
         print results to screen for computation
         """
         def get_focal_length():
             return (d * 100) * height_on_sensor_cm / lmk.height
 
         print('Beginning LandmarkDetector Calibration')
+        import time
         lmk = self.LANDMARKS[44]
         focal_lengths = []
+
         for d in [0.25, 0.5, 1.0, 1.25]:
             input("Place {} {:.2f}m from robot then press any key to continue".format(lmk.name, d))
 
-            import time
             timeout = 5
             time_start = time.time()
-            lmks = None
             while time.time() - time_start < timeout:
                 detections = self.model(get_image_func())
                 landmarks = self.detect_landmarks(detections[0])
