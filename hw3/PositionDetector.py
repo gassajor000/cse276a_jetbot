@@ -5,14 +5,12 @@
 import math
 import random
 import time
-import uuid
 
 from filterpy.kalman import KalmanFilter
 import numpy
-import cv2
-import glob
 
-from jetbot import ObjectDetector, Camera, bgr8_to_jpeg
+from hw3.Camera import Camera
+from jetbot import ObjectDetector
 
 
 def dist(x1, y1, x2, y2):
@@ -25,11 +23,7 @@ class PositionDetector:
     MEASUREMENT_NOISE = 0.05     # Assume distance measurements are +/- 5 cm
     ESTIMATION_PROXIMITY = 0.25  # Bias position readings to within 25cm of predicted position
 
-    # Default values for camera distortion
-    DEFAULT_K = numpy.array([[121.72388176606911, 0.0, 152.47287927762537], [0.0, 161.6329164473156, 142.225856754917], [0.0, 0.0, 1.0]])
-    DEFAULT_D = numpy.array([[0.05000918770713665], [-0.16688048742835998], [0.24973285586862118], [-0.14173811443102421]])
-
-    def __init__(self, init_pos=(0.0, 0.0, 0.0), model_path='/home/jetbot/Notebooks/object_following/', model=None, camera=None):
+    def __init__(self, init_pos=(0.0, 0.0, 0.0), model_path='/home/jetbot/Notebooks/object_following/', model=None, camera_instance=None):
         """
 
         Initialize camera, object detection and Kalman Fiilter
@@ -88,81 +82,18 @@ class PositionDetector:
         else:
             print("Initializing Model...")
             self.model = ObjectDetector(model_path + 'ssd_mobilenet_v2_coco.engine')
-        if camera:
-            self.camera = camera
-        else:
-            print("Initializing Camera...")
-            self.camera = Camera.instance(width=300, height=300)
 
-        self.K = self.DEFAULT_K
-        self.D = self.DEFAULT_D
+        self.camera = Camera(camera_instance)
 
-
-    def calibrate_camera(self, file_path):
-        """Run camera calibration on captured images"""
-        print('Beginning Camera Calibration')
-        CHECKERBOARD = (6,9)
-        subpix_criteria = (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
-        calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC+cv2.fisheye.CALIB_CHECK_COND+cv2.fisheye.CALIB_FIX_SKEW
-        objp = numpy.zeros((1, CHECKERBOARD[0]*CHECKERBOARD[1], 3), numpy.float32)
-        objp[0,:,:2] = numpy.mgrid[0:CHECKERBOARD[0], 0:CHECKERBOARD[1]].T.reshape(-1, 2)
-        _img_shape = None
-        objpoints = [] # 3d point in real world space
-        imgpoints = [] # 2d points in image plane.
-
-        images = glob.glob('images/*.jpg')
-        for fname in images:
-            img = cv2.imread(fname)
-            if _img_shape == None:
-                _img_shape = img.shape[:2]
-            else:
-                assert _img_shape == img.shape[:2], "All images must share the same size."
-            gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-            # Find the chess board corners
-            ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD, cv2.CALIB_CB_ADAPTIVE_THRESH+cv2.CALIB_CB_FAST_CHECK+cv2.CALIB_CB_NORMALIZE_IMAGE)
-            # If found, add object points, image points (after refining them)
-            if ret == True:
-                objpoints.append(objp)
-                cv2.cornerSubPix(gray,corners,(3,3),(-1,-1),subpix_criteria)
-                imgpoints.append(corners)
-
-                img = cv2.drawChessboardCorners(img, CHECKERBOARD, corners, ret)
-                cv2.imwrite(fname + '-processed.png', img)
-
-        N_OK = len(objpoints)
-        K = numpy.zeros((3, 3))
-        D = numpy.zeros((4, 1))
-        rvecs = [numpy.zeros((1, 1, 3), dtype=numpy.float64) for i in range(N_OK)]
-        tvecs = [numpy.zeros((1, 1, 3), dtype=numpy.float64) for i in range(N_OK)]
-        rms, _, _, _, _ = \
-            cv2.fisheye.calibrate(
-                objpoints,
-                imgpoints,
-                gray.shape[::-1],
-                K,
-                D,
-                rvecs,
-                tvecs,
-                calibration_flags,
-                (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 1e-6)
-            )
-        print("Found " + str(N_OK) + " valid images for calibration")
-        print("DIM=" + str(_img_shape[::-1]))
-        print("K=np.array(" + str(K.tolist()) + ")")
-        print("D=np.array(" + str(D.tolist()) + ")")
-        self.K = K
-        self.D = D
-
-        self.undistort_image(cv2.imread(images[0]))
 
     def calibrate(self, file_path='images/'):
         """Calibrate capture images, calibrate camera, calibrate detector"""
-#         self.calibrate_camera(file_path)
-        self.detector.calibrate(self.model, self.camera)
+        self.camera.calibrate(file_path)
+        self.detector.calibrate(self.model, self.camera.get_instance())
 
     def close(self):
         """Clean up resources and extra threads"""
-        self.camera.stop()
+        self.camera.close()
 
     def _make_B_vector(self):
         return numpy.array([
@@ -171,20 +102,6 @@ class PositionDetector:
             [0., 1.]
         ])
 
-    def correct_images(self):
-        images = glob.glob('images/*.jpg')
-        for fname in images:
-            img = cv2.imread(fname)
-            img_corrected = self.undistort_image(img)
-            cv2.imwrite(fname + '-corrected.png', img_corrected)
-
-    def undistort_image(self, image):
-        """undistort the image using the calibrated camera matrix"""
-        map1, map2 = cv2.fisheye.initUndistortRectifyMap(self.K, self.D, numpy.eye(3), self.K, image.shape[:2], cv2.CV_16SC2)
-        undistorted_img = cv2.remap(image, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-
-#         cv2.imwrite('images/calibresult.png', undistorted_img)
-        return undistorted_img
 
     def get_position(self, distance, rotation):
         """
@@ -200,7 +117,7 @@ class PositionDetector:
         landmark_detections = None
         while time.time() < start_time + 5: # 5second timeout
             # undistort image
-            image = self.undistort_image(self.camera.value)
+            image = self.camera.get_image()
             # measure location using camera
             detections = self.model(image)
             landmark_detections = self.detector.detect_landmarks(detections)
