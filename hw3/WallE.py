@@ -2,6 +2,7 @@
     created by Jordan Gassaway, 10/27/2020
     WallE:
 """
+import numpy
 import time
 import math
 
@@ -13,14 +14,11 @@ from threading import Timer
 
 
 class WallE:
-    SPEED_LEFT = 0.5
-    SPEED_RIGHT = 0.515
-
     ERROR_THETA = math.radians(10)  # 10 deg
     ERROR_DISTANCE = 0.1    # 10 cm
 
     def __init__(self):
-        self.robot = jetbot.robot.Robot()
+        self.drive = self.DriveModel()
         self.position = PositionModel()
         self.movement = self.MovementModel()
         self.speed_right = 0.0
@@ -29,7 +27,6 @@ class WallE:
         self.locator = PositionDetector()
         self.updateTimer = Timer(0.02, self.updatePosition)     # update position every 20 ms
         self.updateTimer.start()
-
 
     def drive_to(self, x, y, theta):
         """
@@ -54,22 +51,31 @@ class WallE:
                 # rotate towards x,y
                 self._turn_to_theta(theta_drive)
 
-            # get distance to x, y
-            dist = self.position.get_distance_to(x, y)
             # drive forward to x, y
-            self._drive_distance(dist)
+            self._drive_to_x_y(x, y)
 
         # rotate to theta
         while not self._is_oriented_towards(theta):
             self._turn_to_theta(theta)
 
-    def _drive_to_continuous(self, x, y):
+    def _drive_to_x_y(self, x, y):
         """
         Drive to an (x, y) point assuming a current velocity and angular velocity.
         Adjusts wheel speeds rather than explicitly turning/driving forward.
         """
         while not self._is_at_position(x, y):
-            # TODO
+            # get relative angle to
+            d_theta = self.position.get_rel_angle_to(self.position.get_abs_angle_to(x, y))
+
+            # if off by less than 10 deg, drive forward
+            if abs(d_theta) < math.radians(self.ERROR_THETA):
+                self.drive.forward()
+            elif d_theta > 0:   # if to the left, compute left arc
+
+                self.drive.at_speed(*self.movement.diff_speeds_to())
+            else: # if right, compute right arc
+                self.drive.at_speed(*self.movement.diff_speeds_to())
+
             time.sleep(0.2)  # reevaluate every .2 sec
 
     def drive_path(self, waypoints):
@@ -79,12 +85,12 @@ class WallE:
         """
         # turn towards first point and start driving
         self._turn_to_theta(self.position.get_abs_angle_to(*waypoints[0]))
-        self._set_speed(self.SPEED_RIGHT, self.SPEED_LEFT)
+        self.drive.forward()
 
         for point in waypoints:
-            self._drive_to_continuous(*point)
+            self._drive_to_x_y(*point)
 
-        self.robot.stop()
+        self.drive.stop()
 
     def updatePosition(self):
         new_pos = self.locator.get_position(self.speed_left, self.speed_right)
@@ -101,89 +107,131 @@ class WallE:
         return self.position.get_distance_to(x, y) < self.ERROR_DISTANCE
 
     def calibrate(self):
-        # calibrate left and right speeds
-        print("Adjust right speed until robot drives straight")
-        cmd = 'x'
-        while cmd not in ['c', 'C']:
-            self._forward()
-            cmd = input('Type L to curve left, R to curve right, or C to continue')
-            if cmd in ['l', 'L']:
-                self.SPEED_RIGHT += 0.005
-            if cmd in ['r', 'R']:
-                self.SPEED_RIGHT -= 0.005
-
-        self.robot.stop()
-        print("Speed calibration complete: left speed {:.2f} right speed {:.2f}".format(self.SPEED_LEFT, self.SPEED_RIGHT))
-        input('Press any key to continue')
-        print("Distance calibration")
-        # drive full speed for 1s
-        self._forward()
-        time.sleep(1)
-        self.robot.stop()
-        # enter distance traveled
-        d = float(input("Enter cm traveled: "))
-
-        print("Rotation calibration")
-        # rotate full speed for 1s
-        self._right()
-        time.sleep(1)
-        self.robot.stop()
-        # enter angle rotated
-        t = float(input("Enter degrees rotated (clockwise): "))
-
-        # update movement model
-        self.movement.calibrate(d/100.0, math.radians(t))
-
+        self.drive.calibrate()
+        self.movement.calibrate()
         self.locator.calibrate()
 
     def _turn_to_theta(self, theta):
         """turn to absolute orientation theta"""
         delta = self.position.get_rel_angle_to(theta)
-        t_rotate = self.movement.get_rotation_time(delta)
+        while delta > self.ERROR_THETA:
+            if delta > 0:
+                self.drive.left()
+            else:
+                self.drive.right()
+            time.sleep(0.2)
+            delta = self.position.get_rel_angle_to(theta)
 
-        self._right()
-        time.sleep(t_rotate)
-        self.robot.stop()
+        self.drive.stop()
 
-    def _drive_distance(self, distance):
-        """drive distance forward"""
-        t_drive = self.movement.get_drive_duration(distance)
-
-        self._forward()
-        time.sleep(t_drive)
-        self.robot.stop()
-
-    def _set_speed(self, speed_r, speed_l):
-        self.speed_right = speed_r
-        self.speed_left = speed_l
-        self._drive()
-
-    def _drive(self):
-        self.robot.set_motors(self.speed_left, self.speed_right)
-
-    def _forward(self):
-        self.robot.set_motors(self.SPEED_LEFT, self.SPEED_RIGHT)
-
-    def _right(self):
-        self.robot.set_motors(self.SPEED_LEFT, -self.SPEED_RIGHT)
-
-
-    class MovementModel():
-        # WHEEL_CIRCUMFERENCE = 21.5  # cm
-        # WHEEL_SEPARATION = 10.2 # cm
+    class DriveModel():
+        """Abstraction for driving the robot. Converts velocities to power settings."""
+        BASE_POWER = 0.5
+        R_L_OFFSET = 0.015
+        SPEED_PWR_RATIO = 5
 
         def __init__(self):
-            self.distance_ref = .265    # meters traveled over 1s
-            self.angle_ref = 2.967      # radians (cw) rotated over 1s
+            self.robot = jetbot.robot.Robot()
 
-        def calibrate(self, distance, angle):
-            self.distance_ref = distance
-            self.angle_ref = angle
+        def at_speed(self, speed_r, speed_l):
+            """
+            Set the rotation speeds of the right and left wheels
+            :param speed_r: Right Wheel speed (cm/s)
+            :param speed_l: Left Wheel speed (cm/s)
+            """
+            pwr_r = speed_r * self.SPEED_PWR_RATIO
+            pwr_l = speed_l * self.SPEED_PWR_RATIO
+            self._set_motors(pwr_l, pwr_r)
 
-        def get_drive_duration(self, distance, speed=0.5):
-            """returns time needed to drive :distance: at :speed:"""
-            return distance / self.distance_ref
+        def calibrate(self):
+            # calibrate left and right speeds
+            print("Adjust right speed until robot drives straight")
+            cmd = 'x'
+            while cmd not in ['c', 'C']:
+                self.forward()
+                cmd = input('Type L to curve left, R to curve right, or C to continue')
+                if cmd in ['l', 'L']:
+                    self.R_L_OFFSET += 0.005
+                if cmd in ['r', 'R']:
+                    self.R_L_OFFSET -= 0.005
 
-        def get_rotation_time(self, theta, speed=0.5):
-            """returns time needed to rotate clockwise theta radians"""
-            return theta / self.angle_ref
+            self.robot.stop()
+            print("Speed calibration complete: right/left offset: {}".format(self.R_L_OFFSET))
+            input('Press any key to continue')
+
+            print("Distance calibration")
+            lmb = []   # lambda (speed to power ratio)
+            for pwr in [0.25, 0.5, 0.75]:
+                # drive full speed for 1s
+                self._set_motors(pwr, pwr)
+                time.sleep(1)
+                self.robot.stop()
+                # enter distance traveled
+                lmb.append(pwr / float(input("Enter cm traveled: ")))
+
+            self.SPEED_PWR_RATIO = numpy.mean(lmb, axis=0)
+
+            print("Rotation calibration")
+            # rotate full speed for 1s
+            self.right()
+            time.sleep(1)
+            self.robot.stop()
+            # enter angle rotated
+            t = float(input("Enter degrees rotated (clockwise): "))
+
+        def _set_motors(self, pwr_r, pwr_l):
+            self.robot.set_motors(pwr_l, pwr_r + self.R_L_OFFSET)
+
+        def forward(self):
+            self.robot.set_motors(self.BASE_POWER, self.BASE_POWER + self.R_L_OFFSET)
+
+        def right(self):
+            self.robot.set_motors(self.BASE_POWER, -(self.BASE_POWER + self.R_L_OFFSET))
+
+        def left(self):
+            self.robot.set_motors(-self.BASE_POWER, self.BASE_POWER + self.R_L_OFFSET)
+
+        def stop(self):
+            self.robot.stop()
+
+    class MovementModel():
+        """Model path planning and movement"""
+        # WHEEL_CIRCUMFERENCE = 0.215  # cm
+        WHEEL_SEPARATION = 0.102 # W (cm)
+        MAX_SPEED = 50.0    # maximum wheel speed in cm/s
+        BASE_THETA = math.radians(20)   # assume an arc of 20 deg to start
+
+        def calibrate(self, drive_model):
+            print("Speed calibration")
+            input('Press any key to continue')
+            # drive full speed for 1s
+            drive_model.forward()
+            time.sleep(1)
+            drive_model.stop()
+            # enter distance traveled
+            dist = float(input("Enter cm traveled: "))
+            self.MAX_SPEED = dist
+
+        def arc_to(self, x, y, position: PositionModel):
+            """
+            Compute an arc to x, y from current position. Caps the speed of any wheel at MAX_SPEED
+            :return: (speed_r, speed_l) in cm/s
+            """
+            sec_len = position.get_distance_to(x, y)
+            turn_theta = position.get_rel_angle_to(position.get_abs_angle_to(x, y))
+            left_turn = turn_theta > 0
+
+            if abs(turn_theta) > 90: # just turn sharply instead of computing an arc.
+                v_outer, v_inner = self.MAX_SPEED, 1.0
+                return v_outer, v_inner if left_turn else v_inner, v_outer
+
+            sec_theta = 90 - abs(turn_theta)
+            radius = sec_len / (2* math.cos(sec_theta))
+
+            w = self.WHEEL_SEPARATION
+            dt = (sec_len / self.MAX_SPEED) * 1.25      # time to travers the arc
+            d_outer = radius + w/2
+            d_inner = radius + w/2
+
+            v_r, v_l = (d_outer/dt, d_inner/ dt) if left_turn else (d_inner / dt, d_outer/ dt)
+            return v_r, v_l
