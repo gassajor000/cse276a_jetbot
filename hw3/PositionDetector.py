@@ -16,27 +16,30 @@ class PositionDetector:
     MEASUREMENT_NOISE = 0.05     # Assume distance measurements are +/- 5 cm
     ESTIMATION_PROXIMITY = 0.25  # Bias position readings to within 25cm of predicted position
 
-    def __init__(self, init_pos=(0.0, 0.0, 0.0), model=None, camera_instance=None):
+    def __init__(self, init_pos=(0.0, 0.0, 0.0), initial_v=0.0, initial_omega=0.0, model=None, camera_instance=None):
         """
         Initialize camera, object detection and Kalman Fiilter
-
 
         :param init_pos: initial position (x , y, theta)
 
         Kalman Filter
-        filter.x = (x, y, theta)
+        filter.x = (x, y, theta, v, omega)
         filler.z = (x, y, theta)
-        filter.F =  1 0 0
-                    0 1 0
-                    0 0 1
+        filter.F =  1 0 0 -sin(theta)dt 0
+                    0 1 0 cos(theta)dt  0
+                    0 0 1 0             1
+                    0 0 0 0             0
+                    0 0 0 0             0
         filter.H =  1 0 0
                     0 1 0
                     0 0 1
-        u vector    distance
-                    rotation
-        filter.B =  cos(theta) 0
-                    sin(theta) 0
-                    0          1
+        u vector    velocity
+                    omega
+        filter.B =  0 0
+                    0 0
+                    0 0
+                    1 0
+                    0 1
         filter.P =  5 0 0
                     0 5 0
                     0 0 5
@@ -49,21 +52,26 @@ class PositionDetector:
         """
         # setup kalman filter
         ident = numpy.array([
-            [1., 0., 0.],
-            [0., 1., 0.],
-            [0., 0., 1.],
+            [1., 0., 0., 0., 0.],
+            [0., 1., 0., 0., 0.],
+            [0., 0., 1., 0., 0. ],
+            [0., 0., 0., 1., 0. ],
+            [0., 0., 0., 0., 1. ],
         ])
-        self.filter = KalmanFilter(dim_x=3, dim_z=3)
-        self.filter.x = numpy.array([[init_pos[0], init_pos[1], init_pos[2]]])
+        self.filter = KalmanFilter(dim_x=5, dim_z=3)
+        self.filter.x = numpy.array([[init_pos[0], init_pos[1], init_pos[2]], initial_v, initial_omega])
         self.filter.F = ident
         self.filter.H = ident
         self.filter.P = ident * 5
-        self.filter.Q = numpy.array([
-            [self.MOVEMENT_NOISE, 0, 0,],
-            [0, self.MOVEMENT_NOISE, 0,],
-            [0, 0, self.ROTATION_NOISE,],
-        ])
+        self.filter.Q = ident * self.MOVEMENT_NOISE
         self.filter.R = ident * self.MEASUREMENT_NOISE
+        self.filter.B =  numpy.array([
+            [0, 0],
+            [0, 0],
+            [0, 0],
+            [1, 0],
+            [0, 1],
+        ])
 
         self.detector = LandmarkDetector(model=model)
         self.locator = PositionTriangulator(self.MEASUREMENT_NOISE, self.ESTIMATION_PROXIMITY)
@@ -78,11 +86,13 @@ class PositionDetector:
         """Clean up resources and extra threads"""
         self.camera.close()
 
-    def _make_B_vector(self):
+    def _make_F_matrix(self, dt):
         return numpy.array([
-            [numpy.cos(self.filter.x[2]), 0.],
-            [numpy.sin(self.filter.x[2]), 0.],
-            [0., 1.]
+            [1, 0, 0, -numpy.sin(self.filter.x[2]) * dt, 0],
+            [0, 1, 0, numpy.cos(self.filter.x[2]) * dt, 0],
+            [0, 0, 1, 0, 1],
+            [0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0],
         ])
 
     def get_position(self, velocity, omega, dt):
@@ -94,7 +104,7 @@ class PositionDetector:
         :return: tuple (x, y, theta, v, omega) position, orientation, speed, and angular speed of the robot
         """
         # predict
-        self.filter.predict(u=numpy.array([velocity, omega]), B=self._make_B_vector())
+        self.filter.predict(u=numpy.array([velocity, omega]), F=self._make_F_matrix(dt))
         print("Predicted Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         image = self.camera.get_image()
