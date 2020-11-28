@@ -16,16 +16,15 @@ from threading import Timer
 class WallE:
     ERROR_THETA = math.radians(10)  # 10 deg
     ERROR_DISTANCE = 0.1    # 10 cm
+    UPDATE_DT = 0.02        # 20 ms
 
     def __init__(self):
         self.drive = self.DriveModel()
         self.position = PositionModel()
         self.movement = self.MovementModel()
-        self.speed_right = 0.0
-        self.speed_left = 0.0
 
         self.locator = PositionDetector()
-        self.updateTimer = Timer(0.02, self.updatePosition)     # update position every 20 ms
+        self.updateTimer = Timer(self.UPDATE_DT, self.updatePosition)     # update position every 20 ms
         self.updateTimer.start()
 
     def drive_to(self, x, y, theta):
@@ -53,6 +52,7 @@ class WallE:
 
             # drive forward to x, y
             self._drive_to_x_y(x, y)
+            self.drive.stop()
 
         # rotate to theta
         while not self._is_oriented_towards(theta):
@@ -71,10 +71,12 @@ class WallE:
             if abs(d_theta) < math.radians(self.ERROR_THETA):
                 self.drive.forward()
             elif d_theta > 0:   # if to the left, compute left arc
-
-                self.drive.at_speed(*self.movement.diff_speeds_to())
+                pass
             else: # if right, compute right arc
-                self.drive.at_speed(*self.movement.diff_speeds_to())
+                pass
+
+            self.speed_r, self.speed_l = self.movement.arc_to(x, y, self.position)
+            self.drive.at_speed(self.speed_r, self.speed_l)
 
             time.sleep(0.2)  # reevaluate every .2 sec
 
@@ -93,7 +95,9 @@ class WallE:
         self.drive.stop()
 
     def updatePosition(self):
-        new_pos = self.locator.get_position(self.speed_left, self.speed_right)
+        speed_r, speed_l = self.drive.get_current_speed()
+        v, omega = self.movement.get_current_v_omega(speed_r, speed_l)
+        new_pos = self.locator.get_position(v, omega, self.UPDATE_DT)
         self.position.set_position(**new_pos)
 
     def close(self):
@@ -108,7 +112,7 @@ class WallE:
 
     def calibrate(self):
         self.drive.calibrate()
-        self.movement.calibrate()
+        self.movement.calibrate(self.drive)
         self.locator.calibrate()
 
     def _turn_to_theta(self, theta):
@@ -129,19 +133,12 @@ class WallE:
         BASE_POWER = 0.5
         R_L_OFFSET = 0.015
         SPEED_PWR_RATIO = 5
+        BASE_SPEED = BASE_POWER / SPEED_PWR_RATIO
 
         def __init__(self):
             self.robot = jetbot.robot.Robot()
-
-        def at_speed(self, speed_r, speed_l):
-            """
-            Set the rotation speeds of the right and left wheels
-            :param speed_r: Right Wheel speed (cm/s)
-            :param speed_l: Left Wheel speed (cm/s)
-            """
-            pwr_r = speed_r * self.SPEED_PWR_RATIO
-            pwr_l = speed_l * self.SPEED_PWR_RATIO
-            self._set_motors(pwr_l, pwr_r)
+            self.speed_l = 0.0
+            self.speed_r = 0.0
 
         def calibrate(self):
             # calibrate left and right speeds
@@ -170,6 +167,7 @@ class WallE:
                 lmb.append(pwr / float(input("Enter cm traveled: ")))
 
             self.SPEED_PWR_RATIO = numpy.mean(lmb, axis=0)
+            self.BASE_SPEED = self.BASE_POWER / self.SPEED_PWR_RATIO
 
             print("Rotation calibration")
             # rotate full speed for 1s
@@ -182,17 +180,34 @@ class WallE:
         def _set_motors(self, pwr_r, pwr_l):
             self.robot.set_motors(pwr_l, pwr_r + self.R_L_OFFSET)
 
+        def _set_speed(self, speed_r, speed_l):
+            self.speed_l = speed_l
+            self.speed_r = speed_r
+            r_offset = self.R_L_OFFSET if speed_l >= 0 else -self.R_L_OFFSET
+            self._set_motors(speed_l * self.SPEED_PWR_RATIO, speed_r * self.SPEED_PWR_RATIO + r_offset)
+
+        def at_speed(self, speed_r, speed_l):
+            """
+            Set the rotation speeds of the right and left wheels
+            :param speed_r: Right Wheel speed (cm/s)
+            :param speed_l: Left Wheel speed (cm/s)
+            """
+            self._set_speed(speed_r, speed_l)
+
         def forward(self):
-            self.robot.set_motors(self.BASE_POWER, self.BASE_POWER + self.R_L_OFFSET)
+            self._set_speed(self.BASE_SPEED, self.BASE_SPEED)
 
         def right(self):
-            self.robot.set_motors(self.BASE_POWER, -(self.BASE_POWER + self.R_L_OFFSET))
+            self._set_speed(self.BASE_SPEED, -self.BASE_SPEED)
 
         def left(self):
-            self.robot.set_motors(-self.BASE_POWER, self.BASE_POWER + self.R_L_OFFSET)
+            self._set_speed(-self.BASE_SPEED, self.BASE_SPEED)
 
         def stop(self):
             self.robot.stop()
+
+        def get_current_speed(self):
+            return self.speed_r, self.speed_l
 
     class MovementModel():
         """Model path planning and movement"""
@@ -234,5 +249,26 @@ class WallE:
             d_inner = (radius - w/2) * arc_theta
             dt = (d_outer * arc_theta / self.MAX_SPEED)  # time to travers the arc
 
-            v_r, v_l = (d_outer/dt, d_inner/ dt) if left_turn else (d_inner / dt, d_outer/ dt)
+            v_r, v_l = (d_outer/dt, d_inner/dt) if left_turn else (d_inner/dt, d_outer/dt)
             return v_r, v_l, arc_theta
+
+        def _get_turn_radius(self, vo, vi):
+            """:returns turn radius from vr and vl in cm"""
+            v_ratio = vo / vi
+            w = self.WHEEL_SEPARATION / 2
+            r = (w * (v_ratio + 1) / (v_ratio - 1))
+            return r
+
+        def _get_velocity(self, vi, r):
+            """returns forward velocity of the robot (irrespective of orientation)"""
+            return r * vi / (r - self.WHEEL_SEPARATION/2)
+
+        def get_current_v_omega(self, vr, vl):
+            """get forward velocity and angular velocity from wheel velocities
+            :returns forward velocity (cm/s), angular velocity (rad/s)
+            """
+            vo, vi = (vr, vl) if vr > vl else (vl, vr)
+            r = self._get_turn_radius(vo, vi)
+            v = self._get_velocity(vi, r)
+
+            return v, v / r
