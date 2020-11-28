@@ -59,7 +59,12 @@ class PositionModel():
 
         return adjustment[quadrant](theta_horizontal)
 
-    def get_rel_angle_to(self, theta):
+    def get_rel_angle_to(self, theta, allow_clockwise=False):
         """returns counter clockwise offset between theta and current orientation"""
         # t1 >= t0: t1 - t0, t0 > t1: (t0 - 2pi) + t1
-        return theta - self.theta if theta >= self.theta else (2 * math.pi) - self.theta + theta
+        rel_angle =  theta - self.theta if theta >= self.theta else (2 * math.pi) - self.theta + theta
+
+        if allow_clockwise and rel_angle > math.pi:     # subtract 2pi to make it a negitve angle (clockwise turn) instead
+            return rel_angle - 2 * math.pi
+        else:
+            return rel_angle

@@ -80,3 +80,66 @@ class TestWallEMovementModel(TestCase):
             vec_r = (math.sin(start[2] + self.RAD_90), math.cos(start[2] + self.RAD_90))
             dot_product = vec_c[0] * vec_r[0] + vec_c[1] * vec_r[1]
             self.assertAlmostEqual(dot_product, 0.0, delta= 0.001, msg="Circle was not tangent to orientation!")
+
+    def test_arc_to_plotting(self):
+        """arc to returns a valid arc to the point and neither wheel speed exceeds the max speed."""
+
+        def get_dist(x1, y1, x2, y2):
+            return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+
+        def get_r(vr, vl):
+            vo, vi = (vr, vl) if vr > vl else (vl, vr)
+            v_ratio = vo / vi
+            w = mm.WHEEL_SEPARATION / 2
+            r = (w * (v_ratio + 1) / (v_ratio - 1))
+            return r / 100.0
+
+        def get_center(r, theta, start, end):
+            # place robot at (0, 0), point at (d, 0)
+            # compute cx, cy
+            phi = self.RAD_90 - abs(theta) / 2
+            y_side = 1 if theta > 0 else -1
+            cx0, cy0 = r * math.cos(phi), y_side * r * math.sin(phi)
+
+            # rotate around robot
+            theta_rotate = pos.get_abs_angle_to(end[0], end[1]) + self.RAD_90
+            cx1 = cx0 * math.cos(theta_rotate) - cy0 * math.sin(theta_rotate)
+            cy1 = cx0 * math.sin(theta_rotate) + cy0 * math.cos(theta_rotate)
+
+            # translate to global origin
+            cx2 = cx1 + start[0]
+            cy2 = cy1 + start[1]
+            return cx2, cy2
+
+        test_cases = [  # position, point
+            ((0, 0, 0), (-1, 1)),  # simple
+            ((0, 0, 0), (1, 1)),   # right turn
+            ((0, 0, self.RAD_90), (-1, -1)),   # oriented left
+            ((0, 0, 3 * self.RAD_90), (1, 1)),  # oriented right
+            ((0, 0, 0), (-0.5, 1)),   # harder angle
+            ((2, 3, 0),  (1, 4)),   # offset from center
+        ]
+
+        mm = WallE.MovementModel()
+        for test_case in test_cases:
+            print('Testing ' + str(test_case))
+            start, end = test_case
+            pos = PositionModel(x=start[0], y=start[1], theta=start[2])
+
+            vr, vl, arc_theta = mm.arc_to(end[0], end[1], pos)
+            print("\tvr, vl {}, vr {}, arc {}".format(vr, vl, arc_theta))
+            r = get_r(vr, vl)
+            rel_theta = arc_theta if vr > vl else -arc_theta
+            cx, cy = get_center(r, rel_theta, start, end)
+            print("\tCircle center {}, {}".format(cx, cy))
+
+            # make sure center is  r away from both points
+            d1, d2 = get_dist(cx, cy, start[0], start[1]), get_dist(cx, cy, end[0], end[1])
+            self.assertAlmostEqual(d1, r, delta=0.001, msg="Invalid circle coordinates")
+            self.assertAlmostEqual(d2, r, delta=0.001, msg="Invalid circle coordinates")
+
+            # make sure its tangent to orientation
+            vec_c = (cx - start[0], cy - start[1])
+            vec_r = (math.cos(start[2] + self.RAD_90), math.sin(start[2] + self.RAD_90))
+            dot_product = vec_c[0] * vec_r[0] + vec_c[1] * vec_r[1]
+            self.assertAlmostEqual(dot_product, 0.0, delta=0.001, msg="Circle was not tangent to orientation!")

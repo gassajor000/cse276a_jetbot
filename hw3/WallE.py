@@ -215,15 +215,15 @@ class WallE:
         def arc_to(self, x, y, position: PositionModel):
             """
             Compute an arc to x, y from current position. Caps the speed of any wheel at MAX_SPEED
-            :return: (speed_r, speed_l) in cm/s
+            :return: (speed_r, speed_l, arc_theta) in cm/s, radians
             """
             sec_len = position.get_distance_to(x, y) * 100
-            turn_theta = position.get_rel_angle_to(position.get_abs_angle_to(x, y))
+            turn_theta = position.get_rel_angle_to(position.get_abs_angle_to(x, y), allow_clockwise=True)
             left_turn = turn_theta > 0
 
             if abs(turn_theta) > self.RAD_90: # just turn sharply instead of computing an arc.
                 v_outer, v_inner = self.MAX_SPEED, 1.0
-                return v_outer, v_inner if left_turn else v_inner, v_outer
+                return (v_outer, v_inner, math.pi) if left_turn else (v_inner, v_outer, -math.pi)
 
             sec_theta = self.RAD_90 - abs(turn_theta)
             arc_theta = math.pi - 2* sec_theta
@@ -235,4 +235,4 @@ class WallE:
             dt = (d_outer * arc_theta / self.MAX_SPEED)  # time to travers the arc
 
             v_r, v_l = (d_outer/dt, d_inner/ dt) if left_turn else (d_inner / dt, d_outer/ dt)
-            return v_r, v_l
+            return v_r, v_l, arc_theta
