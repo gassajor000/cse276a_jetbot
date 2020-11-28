@@ -197,9 +197,9 @@ class WallE:
     class MovementModel():
         """Model path planning and movement"""
         # WHEEL_CIRCUMFERENCE = 0.215  # cm
-        WHEEL_SEPARATION = 0.102 # W (cm)
+        WHEEL_SEPARATION = 13.1 # W (cm)
         MAX_SPEED = 50.0    # maximum wheel speed in cm/s
-        BASE_THETA = math.radians(20)   # assume an arc of 20 deg to start
+        RAD_90 = math.pi / 2
 
         def calibrate(self, drive_model):
             print("Speed calibration")
@@ -217,21 +217,22 @@ class WallE:
             Compute an arc to x, y from current position. Caps the speed of any wheel at MAX_SPEED
             :return: (speed_r, speed_l) in cm/s
             """
-            sec_len = position.get_distance_to(x, y)
+            sec_len = position.get_distance_to(x, y) * 100
             turn_theta = position.get_rel_angle_to(position.get_abs_angle_to(x, y))
             left_turn = turn_theta > 0
 
-            if abs(turn_theta) > 90: # just turn sharply instead of computing an arc.
+            if abs(turn_theta) > self.RAD_90: # just turn sharply instead of computing an arc.
                 v_outer, v_inner = self.MAX_SPEED, 1.0
                 return v_outer, v_inner if left_turn else v_inner, v_outer
 
-            sec_theta = 90 - abs(turn_theta)
+            sec_theta = self.RAD_90 - abs(turn_theta)
+            arc_theta = math.pi - 2* sec_theta
             radius = sec_len / (2* math.cos(sec_theta))
 
             w = self.WHEEL_SEPARATION
-            dt = (sec_len / self.MAX_SPEED) * 1.25      # time to travers the arc
-            d_outer = radius + w/2
-            d_inner = radius + w/2
+            d_outer = (radius + w/2) * arc_theta
+            d_inner = (radius - w/2) * arc_theta
+            dt = (d_outer * arc_theta / self.MAX_SPEED)  # time to travers the arc
 
             v_r, v_l = (d_outer/dt, d_inner/ dt) if left_turn else (d_inner / dt, d_outer/ dt)
             return v_r, v_l

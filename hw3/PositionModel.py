@@ -31,7 +31,7 @@ class PositionModel():
         self.theta = theta
 
     def get_distance_to(self, x, y):
-        """returns the distance from the current position to the specified point"""
+        """returns the distance from the current position to the specified point (assumes meters)"""
         return math.sqrt((x - self.x) ** 2 + (y - self.y) ** 2)
 
     def get_abs_angle_to(self, x, y):
@@ -52,14 +52,14 @@ class PositionModel():
 
         theta_horizontal = abs(math.atan((y - self.y) / (x - self.x)))
 
-        adjustment = {1: lambda t: math.pi / 2 - t,  # 90 deg - theta
-                      2: lambda t: 3 * math.pi / 2 + t,  # 270 deg + theta
-                      3: lambda t: 3 * math.pi / 2 - t,  # 270 deg - theta
-                      4: lambda t: math.pi / 2 + t}  # 90 deg + theta
+        adjustment = {1: lambda t: 3*math.pi / 2 + t,  # 270 deg + theta
+                      2: lambda t: math.pi / 2 - t,  # 90 deg - theta
+                      3: lambda t: math.pi / 2 + t,  # 90 deg + theta
+                      4: lambda t: 3*math.pi / 2 - t}  # 270 deg - theta
 
         return adjustment[quadrant](theta_horizontal)
 
     def get_rel_angle_to(self, theta):
-        """returns clockwise offset between theta and current orientation"""
+        """returns counter clockwise offset between theta and current orientation"""
         # t1 >= t0: t1 - t0, t0 > t1: (t0 - 2pi) + t1
         return theta - self.theta if theta >= self.theta else (2 * math.pi) - self.theta + theta
