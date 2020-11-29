@@ -76,6 +76,7 @@ class PositionDetector:
         self.detector = LandmarkDetector(model=model)
         self.locator = PositionTriangulator(self.MEASUREMENT_NOISE, self.ESTIMATION_PROXIMITY)
         self.camera = Camera(camera_instance)
+        self.logging = False
 
     def calibrate(self, file_path='images/'):
         """Calibrate capture images, calibrate camera, calibrate detector"""

@@ -24,7 +24,7 @@ class WallE:
         self.movement = self.MovementModel()
 
         self.locator = PositionDetector()
-        self.updateTimer = self.UpdateThread(self.UPDATE_DT, self.update_position)     # update position every 20 ms
+        self.updateTimer = self.UpdateThread(self.UPDATE_DT, self.updatePosition)     # update position every 20 ms
         self.updateTimer.start()
 
     def drive_to(self, x, y, theta):
@@ -46,6 +46,7 @@ class WallE:
         while not self._is_at_position(x, y):
             # get angle to rotate towards x, y
             theta_drive = self.position.get_abs_angle_to(x, y)
+            print("Turn to {:.2f}".format(theta_drive))
             while not self._is_oriented_towards(theta_drive):
                 # rotate towards x,y
                 self._turn_to_theta(theta_drive)
@@ -63,6 +64,8 @@ class WallE:
         Drive to an (x, y) point assuming a current velocity and angular velocity.
         Adjusts wheel speeds rather than explicitly turning/driving forward.
         """
+        print("Drive to {:.2f} {:.2f}".format(x, y))
+
         while not self._is_at_position(x, y):
             # get relative angle to
             d_theta = self.position.get_rel_angle_to(self.position.get_abs_angle_to(x, y))
@@ -94,7 +97,7 @@ class WallE:
 
         self.drive.stop()
 
-    def update_position(self):
+    def updatePosition(self):
         speed_r, speed_l = self.drive.get_current_speed()
         v, omega = self.movement.get_current_v_omega(speed_r, speed_l)
         print("v: {:.4f} w: {:.4f}".format(v, omega))
@@ -118,13 +121,14 @@ class WallE:
 
     def _turn_to_theta(self, theta):
         """turn to absolute orientation theta"""
+        print("Turn to {:.2f}".format(theta))
         delta = self.position.get_rel_angle_to(theta)
+        if delta > 0:
+            self.drive.left()
+        else:
+            self.drive.right()
         while delta > self.ERROR_THETA:
-            if delta > 0:
-                self.drive.left()
-            else:
-                self.drive.right()
-            time.sleep(0.2)
+            time.sleep(0.02)
             delta = self.position.get_rel_angle_to(theta)
 
         self.drive.stop()
@@ -196,6 +200,7 @@ class WallE:
             self.robot.set_motors(pwr_l, pwr_r + self.R_L_OFFSET)
 
         def _set_speed(self, speed_r, speed_l):
+#             print("set speed r {} l {}".format(speed_r, speed_l))
             self.speed_l = speed_l
             self.speed_r = speed_r
             r_offset = self.R_L_OFFSET if speed_l >= 0 else -self.R_L_OFFSET
@@ -207,18 +212,23 @@ class WallE:
             :param speed_r: Right Wheel speed (cm/s)
             :param speed_l: Left Wheel speed (cm/s)
             """
+            print("--drive: at speed {} {}".format(speed_r, speed_l))
             self._set_speed(speed_r, speed_l)
 
         def forward(self):
+            print("--drive: forward")
             self._set_speed(self.BASE_SPEED, self.BASE_SPEED)
 
         def right(self):
+            print("--drive: right")
             self._set_speed(self.BASE_SPEED, -self.BASE_SPEED)
 
         def left(self):
+            print("--drive: left")
             self._set_speed(-self.BASE_SPEED, self.BASE_SPEED)
 
         def stop(self):
+            print("--drive: stop")
             self.robot.stop()
 
         def get_current_speed(self):
@@ -262,7 +272,7 @@ class WallE:
             w = self.WHEEL_SEPARATION
             d_outer = (radius + w/2) * arc_theta
             d_inner = (radius - w/2) * arc_theta
-            dt = (d_outer * arc_theta / self.MAX_SPEED)  # time to travers the arc
+            dt = (d_outer / self.MAX_SPEED)  # time to travers the arc
 
             v_r, v_l = (d_outer/dt, d_inner/dt) if left_turn else (d_inner/dt, d_outer/dt)
             return v_r, v_l, arc_theta
@@ -285,8 +295,7 @@ class WallE:
             if vr == vl:    # if speeds are the same, we are going straight (not turning)
                 return vr, 0.0
             elif vr == -vl: # special case, rotating in place. r = w/2, v = vr
-                return 0.0, vr / (self.WHEEL_SEPARATION / 2)
-
+                return 0.0, vr / (self.WHEEL_SEPARATION / 2) * 0.8     # Seems to rotate slower than predicted wheel velocities
 
             vo, vi = (vr, vl) if vr > vl else (vl, vr)
             r = self._get_turn_radius(vo, vi)
