@@ -30,9 +30,10 @@ class PositionDetector:
                     0 0 1 0             dt
                     0 0 0 0             0
                     0 0 0 0             0
-        filter.H =  1 0 0
-                    0 1 0
-                    0 0 1
+        filter.H =  1 0 0 0 0
+                    0 1 0 0 0
+                    0 0 1 0 0
+
         u vector    velocity
                     omega
         filter.B =  0 0
@@ -61,7 +62,11 @@ class PositionDetector:
         self.filter = KalmanFilter(dim_x=5, dim_z=3)
         self.filter.x = numpy.array([init_pos[0], init_pos[1], init_pos[2], initial_v, initial_omega])
         self.filter.F = ident
-        self.filter.H = ident
+        self.filter.H = numpy.array([
+            [1., 0., 0., 0., 0.],
+            [0., 1., 0., 0., 0.],
+            [0., 0., 1., 0., 0.],
+        ])
         self.filter.P = ident * 5
         self.filter.Q = ident * self.MOVEMENT_NOISE
         self.filter.R = ident * self.MEASUREMENT_NOISE
@@ -73,6 +78,10 @@ class PositionDetector:
             [0, 1],
         ])
         self.logging = False
+
+        self.detector = LandmarkDetector(model=model)
+        self.locator = PositionTriangulator(self.MEASUREMENT_NOISE, self.ESTIMATION_PROXIMITY)
+        self.camera = Camera(camera_instance)
 
     def calibrate(self, file_path='images/'):
         """Calibrate capture images, calibrate camera, calibrate detector"""
@@ -123,12 +132,13 @@ class PositionDetector:
         landmark_distances = list(map(lambda lmk: self.detector.get_distance_to_landmark(**lmk), landmark_detections))
         landmark_angles = list(map(lambda lmk: self.detector.get_angle_offset_to_landmark(**lmk), landmark_detections))
 
-        x1, y1 = self.locator.get_position_from_landmarks(landmark_distances, tuple(self.filter.x))
+        x1, y1, confidence = self.locator.get_position_from_landmarks(landmark_distances, tuple(self.filter.x))
         theta = self.locator.get_orientation_from_landmarks(landmark_angles, tuple(self.filter.x))
-        print("Computed Position ({:.3f}, {:.3f}, {:.3f})".format(x1, y1, theta))
+        if self.logging:
+            print("Computed Position ({:.3f}, {:.3f}, {:.3f})".format(x1, y1, theta))
 
-#         self.filter.update(z=(x1, y1, theta))
-#         if self.logging:
-#           print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
+        self.filter.update(z=(x1, y1, theta))
+        if self.logging:
+          print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         return self.filter.x
