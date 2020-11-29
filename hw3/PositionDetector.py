@@ -69,7 +69,7 @@ class PositionDetector:
         ])
         self.filter.P = ident * 5
         self.filter.Q = ident * self.MOVEMENT_NOISE
-        self.filter.R = ident * self.MEASUREMENT_NOISE
+        self.filter.R = numpy.eye(3) * self.MEASUREMENT_NOISE
         self.filter.B =  numpy.array([
             [0, 0],
             [0, 0],

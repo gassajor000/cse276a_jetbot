@@ -162,7 +162,7 @@ class PositionTriangulator():
 
         # remove outliers
         g_avg = float(numpy.mean(global_thetas))
-        if len(landmark_thetas > 2):
+        if len(landmark_thetas) > 2:
             g_std = float(numpy.std(global_thetas))
             for val in global_thetas:
                 z = (val - g_avg) / g_std
