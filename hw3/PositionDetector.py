@@ -137,13 +137,13 @@ class PositionDetector:
             landmark_distances.append((lmk.position, self.detector.get_distance_to_landmark(lmk, det)))
             landmark_angles.append((lmk, self.detector.get_angle_offset_to_landmark(det)))
 
-        x1, y1, confidence = self.locator.get_position_from_landmarks(landmark_distances, tuple(self.filter.x))
+        pos, confidence = self.locator.get_position_from_landmarks(landmark_distances, tuple(self.filter.x))
         theta = self.locator.get_orientation_from_landmarks(landmark_angles, tuple(self.filter.x))
         if self.logging:
-            print("Computed Position ({:.3f}, {:.3f}, {:.3f})".format(x1, y1, theta))
+            print("Computed Position ({:.3f}, {:.3f}, {:.3f})".format(pos[0], pos[1], theta))
 
-        self.filter.update(z=(x1, y1, theta))
+        self.filter.update(z=(pos[0], pos[1], theta))
         if self.logging:
-          print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
+            print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         return self.filter.x
