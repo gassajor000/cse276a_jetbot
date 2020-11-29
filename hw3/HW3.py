@@ -51,13 +51,16 @@ if __name__ == '__main__':
     finally:
         p.close()
 
-    # W = WallE()
-    # W.calibrate()
-    # W.drive_to(-1, 0, 0)
-    # time.sleep(1)
-    # W.drive_to(-1, 1, 1.57)
-    # time.sleep(1)
-    # W.drive_to(-2, 1, 0)
+    W = WallE()
+    try:
+        W.calibrate()
+        W.drive_to(-1, 0, 0)
+        time.sleep(1)
+        W.drive_to(-1, 1, 1.57)
+        time.sleep(1)
+        W.drive_to(-2, 1, 0)
 
-    # drive_to_waypoints(W)
+        drive_to_waypoints(W)
+    finally:
+        W.close()
 

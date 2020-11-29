@@ -5,9 +5,9 @@
 from filterpy.kalman import KalmanFilter
 import numpy
 
-from hw3.Camera import Camera
-from hw3.LandmarkDetector import LandmarkDetector
-from hw3.PositionTriangulator import PositionTriangulator
+from Camera import Camera
+from LandmarkDetector import LandmarkDetector
+from PositionTriangulator import PositionTriangulator
 
 
 class PositionDetector:
@@ -27,7 +27,7 @@ class PositionDetector:
         filler.z = (x, y, theta)
         filter.F =  1 0 0 -sin(theta)dt 0
                     0 1 0 cos(theta)dt  0
-                    0 0 1 0             1
+                    0 0 1 0             dt
                     0 0 0 0             0
                     0 0 0 0             0
         filter.H =  1 0 0
@@ -59,7 +59,7 @@ class PositionDetector:
             [0., 0., 0., 0., 1. ],
         ])
         self.filter = KalmanFilter(dim_x=5, dim_z=3)
-        self.filter.x = numpy.array([[init_pos[0], init_pos[1], init_pos[2]], initial_v, initial_omega])
+        self.filter.x = numpy.array([[init_pos[0], init_pos[1], init_pos[2], initial_v, initial_omega]])
         self.filter.F = ident
         self.filter.H = ident
         self.filter.P = ident * 5
@@ -90,10 +90,18 @@ class PositionDetector:
         return numpy.array([
             [1, 0, 0, -numpy.sin(self.filter.x[2]) * dt, 0],
             [0, 1, 0, numpy.cos(self.filter.x[2]) * dt, 0],
-            [0, 0, 1, 0, 1],
+            [0, 0, 1, 0, dt],
             [0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0],
         ])
+
+    def wrap_theta(self):
+        theta = self.filter.x[2]
+        pi_2 = 2 * numpy.pi
+        if theta >= pi_2:
+            self.filter.x[2] -= pi_2
+        elif theta < 0:
+            self.filter.x[2] += pi_2
 
     def get_position(self, velocity, omega, dt):
         """
@@ -105,7 +113,8 @@ class PositionDetector:
         """
         # predict
         self.filter.predict(u=numpy.array([velocity, omega]), F=self._make_F_matrix(dt))
-        print("Predicted Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
+        self.wrap_theta()
+        print("Predicted Position ({:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         image = self.camera.get_image()
         landmark_detections = self.detector.detect_landmarks(image)
@@ -121,6 +130,7 @@ class PositionDetector:
         print("Computed Position ({:.3f}, {:.3f}, {:.3f})".format(x1, y1, theta))
 
         self.filter.update(z=(x1, y1, theta))
+        self.wrap_theta()
         print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         return self.filter.x

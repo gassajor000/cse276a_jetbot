@@ -7,10 +7,10 @@ import time
 import math
 
 import jetbot
-from hw3.PositionModel import PositionModel
-from hw3.PositionDetector import PositionDetector
+from PositionModel import PositionModel
+from PositionDetector import PositionDetector
 
-from threading import Timer
+from threading import Thread, Event
 
 
 class WallE:
@@ -24,7 +24,7 @@ class WallE:
         self.movement = self.MovementModel()
 
         self.locator = PositionDetector()
-        self.updateTimer = Timer(self.UPDATE_DT, self.updatePosition)     # update position every 20 ms
+        self.updateTimer = self.UpdateThread(self.UPDATE_DT, self.update_position)     # update position every 20 ms
         self.updateTimer.start()
 
     def drive_to(self, x, y, theta):
@@ -75,7 +75,7 @@ class WallE:
             else: # if right, compute right arc
                 pass
 
-            self.speed_r, self.speed_l = self.movement.arc_to(x, y, self.position)
+            self.speed_r, self.speed_l, _ = self.movement.arc_to(x, y, self.position)
             self.drive.at_speed(self.speed_r, self.speed_l)
 
             time.sleep(0.2)  # reevaluate every .2 sec
@@ -94,11 +94,12 @@ class WallE:
 
         self.drive.stop()
 
-    def updatePosition(self):
+    def update_position(self):
         speed_r, speed_l = self.drive.get_current_speed()
         v, omega = self.movement.get_current_v_omega(speed_r, speed_l)
-        new_pos = self.locator.get_position(v, omega, self.UPDATE_DT)
-        self.position.set_position(**new_pos)
+        print("v: {:.4f} w: {:.4f}".format(v, omega))
+        new_pos = self.locator.get_position(v / 100.0, omega, self.UPDATE_DT)
+        self.position.set_position(new_pos[0], new_pos[1], new_pos[2])
 
     def close(self):
         self.locator.close()
@@ -128,11 +129,29 @@ class WallE:
 
         self.drive.stop()
 
+    class UpdateThread(Thread):
+        def __init__(self, interval, update_func):
+            super().__init__()
+            self.update_func = update_func
+            self.interval = interval
+            self._cancel_flag = Event()
+
+        def cancel(self):
+            self._cancel_flag.set()
+
+        def run(self):
+            while not self._cancel_flag.is_set():
+                ts = time.time()
+                self.update_func()
+                tf = time.time()
+                t_exec = tf - ts
+                time.sleep(self.interval - t_exec)
+
     class DriveModel():
         """Abstraction for driving the robot. Converts velocities to power settings."""
         BASE_POWER = 0.5
-        R_L_OFFSET = 0.015
-        SPEED_PWR_RATIO = 5
+        R_L_OFFSET = 0.035
+        SPEED_PWR_RATIO = 0.0209
         BASE_SPEED = BASE_POWER / SPEED_PWR_RATIO
 
         def __init__(self):
@@ -142,6 +161,7 @@ class WallE:
 
         def calibrate(self):
             # calibrate left and right speeds
+            print("Alignment calibration")
             print("Adjust right speed until robot drives straight")
             cmd = 'x'
             while cmd not in ['c', 'C']:
@@ -153,29 +173,24 @@ class WallE:
                     self.R_L_OFFSET -= 0.005
 
             self.robot.stop()
-            print("Speed calibration complete: right/left offset: {}".format(self.R_L_OFFSET))
+            print("Alignment calibration complete: right/left offset: {}".format(self.R_L_OFFSET))
             input('Press any key to continue')
 
-            print("Distance calibration")
+            print("Power calibration")
             lmb = []   # lambda (speed to power ratio)
-            for pwr in [0.25, 0.5, 0.75]:
+            for pwr in [0.4, 0.44, 0.48, 0.52, 0.56, 0.58, 0.62]:
                 # drive full speed for 1s
                 self._set_motors(pwr, pwr)
                 time.sleep(1)
                 self.robot.stop()
                 # enter distance traveled
-                lmb.append(pwr / float(input("Enter cm traveled: ")))
+                ratio = pwr / float(input("Enter cm traveled: "))
+                lmb.append(ratio)
+                print("\t pwr to distance ratio: {}".format(ratio))
 
             self.SPEED_PWR_RATIO = numpy.mean(lmb, axis=0)
             self.BASE_SPEED = self.BASE_POWER / self.SPEED_PWR_RATIO
-
-            print("Rotation calibration")
-            # rotate full speed for 1s
-            self.right()
-            time.sleep(1)
-            self.robot.stop()
-            # enter angle rotated
-            t = float(input("Enter degrees rotated (clockwise): "))
+            print("Power calibration complete: pwr conversion factor: {}".format(self.SPEED_PWR_RATIO))
 
         def _set_motors(self, pwr_r, pwr_l):
             self.robot.set_motors(pwr_l, pwr_r + self.R_L_OFFSET)
@@ -184,7 +199,7 @@ class WallE:
             self.speed_l = speed_l
             self.speed_r = speed_r
             r_offset = self.R_L_OFFSET if speed_l >= 0 else -self.R_L_OFFSET
-            self._set_motors(speed_l * self.SPEED_PWR_RATIO, speed_r * self.SPEED_PWR_RATIO + r_offset)
+            self._set_motors(speed_r * self.SPEED_PWR_RATIO + r_offset, speed_l * self.SPEED_PWR_RATIO)
 
         def at_speed(self, speed_r, speed_l):
             """
@@ -213,7 +228,7 @@ class WallE:
         """Model path planning and movement"""
         # WHEEL_CIRCUMFERENCE = 0.215  # cm
         WHEEL_SEPARATION = 13.1 # W (cm)
-        MAX_SPEED = 50.0    # maximum wheel speed in cm/s
+        MAX_SPEED = 24.0    # maximum wheel speed in cm/s
         RAD_90 = math.pi / 2
 
         def calibrate(self, drive_model):
@@ -267,6 +282,12 @@ class WallE:
             """get forward velocity and angular velocity from wheel velocities
             :returns forward velocity (cm/s), angular velocity (rad/s)
             """
+            if vr == vl:    # if speeds are the same, we are going straight (not turning)
+                return vr, 0.0
+            elif vr == -vl: # special case, rotating in place. r = w/2, v = vr
+                return 0.0, vr / (self.WHEEL_SEPARATION / 2)
+
+
             vo, vi = (vr, vl) if vr > vl else (vl, vr)
             r = self._get_turn_radius(vo, vi)
             v = self._get_velocity(vi, r)
