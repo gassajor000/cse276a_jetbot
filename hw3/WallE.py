@@ -16,7 +16,8 @@ from threading import Thread, Event
 class WallE:
     ERROR_THETA = math.radians(10)  # 10 deg
     ERROR_DISTANCE = 0.1    # 10 cm
-    UPDATE_DT = 0.02        # 20 ms
+    UPDATE_DT = 0.15        # 20 ms
+    EVAL_POSITION = 0.05    # 50 ms
 
     def __init__(self):
         self.drive = self.DriveModel()
@@ -83,7 +84,7 @@ class WallE:
             self.speed_r, self.speed_l, _ = self.movement.arc_to(x, y, self.position)
             self.drive.at_speed(self.speed_r, self.speed_l)
 
-            time.sleep(0.2)  # reevaluate every .2 sec
+            time.sleep(self.EVAL_POSITION)  # reevaluate every .2 sec
 
     def drive_path(self, waypoints):
         """
@@ -109,6 +110,7 @@ class WallE:
     def close(self):
         self.locator.close()
         self.updateTimer.cancel()
+        self.updateTimer.join()
 
     def _is_oriented_towards(self, desired_theta):
         return abs(self.position.theta - desired_theta) < self.ERROR_THETA
@@ -130,7 +132,7 @@ class WallE:
         else:
             self.drive.right()
         while delta > self.ERROR_THETA:
-            time.sleep(0.02)
+            time.sleep(self.EVAL_POSITION)
             delta = self.position.get_rel_angle_to(theta)
 
         self.drive.stop()
@@ -245,7 +247,7 @@ class WallE:
         """Model path planning and movement"""
         # WHEEL_CIRCUMFERENCE = 0.215  # cm
         WHEEL_SEPARATION = 13.1 # W (cm)
-        MAX_SPEED = 24.0    # maximum wheel speed in cm/s
+        MAX_SPEED = 12.0    # maximum wheel speed in cm/s
         RAD_90 = math.pi / 2
 
         def calibrate(self, drive_model):

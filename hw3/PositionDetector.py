@@ -127,6 +127,8 @@ class PositionDetector:
         landmark_detections = self.detector.detect_landmarks(image)
 
         if not landmark_detections:
+            if self.logging:
+                print("No landmarks detected")
             return self.filter.x    # Couldn't find any landmarks. Just use the prediction.
 
         landmark_distances = list(map(lambda lmk: self.detector.get_distance_to_landmark(**lmk), landmark_detections))
