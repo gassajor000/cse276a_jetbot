@@ -95,7 +95,7 @@ class LandmarkDetector():
         """
         Return a list of all landmarks currently visible, paired with the detection data, keyed by the landmark label
         """
-        detections = self.model(image)
+        detections = self.model(image)[0]
         landmarks = {}
         for det in detections:
             lmk = self._get_landmark(det)

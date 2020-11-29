@@ -20,6 +20,7 @@ class WallE:
 
     def __init__(self):
         self.drive = self.DriveModel()
+        self.drive.stop()   # Kill any previous drive commands
         self.position = PositionModel()
         self.movement = self.MovementModel()
 
@@ -27,7 +28,6 @@ class WallE:
         self.updateTimer = self.UpdateThread(self.UPDATE_DT, self.updatePosition)     # update position every 20 ms
         self.updateTimer.start()
 
-        self.drive.stop()   # Kill any previous drive commands
 
     def drive_to(self, x, y, theta):
         """
@@ -151,7 +151,10 @@ class WallE:
                 self.update_func()
                 tf = time.time()
                 t_exec = tf - ts
-                time.sleep(self.interval - t_exec)
+                if t_exec < self.interval:
+                    time.sleep(self.interval - t_exec)
+                else:
+                    print("Timer over run! Exec Time: {:.5f}".format(t_exec))
 
     class DriveModel():
         """Abstraction for driving the robot. Converts velocities to power settings."""

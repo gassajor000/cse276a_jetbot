@@ -43,22 +43,14 @@ def take_images():
 if __name__ == '__main__':
     # take_images()
 
-    from PositionDetector import PositionDetector
-
-    p = PositionDetector()
-    try:
-        p.calibrate()
-    finally:
-        p.close()
-
     W = WallE()
     try:
-        W.calibrate()
-        W.drive_to(-1, 0, 0)
+        # W.calibrate()
+        W.drive_to(1, 0, 0)
         time.sleep(1)
-        W.drive_to(-1, 1, 1.57)
+        W.drive_to(1, 1, 3.14)
         time.sleep(1)
-        W.drive_to(-2, 1, 0)
+        W.drive_to(2, 1, 0)
 
         drive_to_waypoints(W)
     finally:

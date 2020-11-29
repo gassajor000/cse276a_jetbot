@@ -37,7 +37,7 @@ class PositionTriangulator():
 
         def is_inside_rings(self, origin, r_outer, r_inner):
             # True if particle lies inside the two rings, False otherwise
-            d = dist(self.x, self.y, origin[0], origin[1])
+            d = PositionTriangulator.dist(self.x, self.y, origin[0], origin[1])
             return d <= r_outer and d >= r_inner
 
         def __str__(self):
