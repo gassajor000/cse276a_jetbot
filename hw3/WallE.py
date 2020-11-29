@@ -68,7 +68,7 @@ class WallE:
         Adjusts wheel speeds rather than explicitly turning/driving forward.
         """
         print("Drive to {:.2f} {:.2f}".format(x, y))
-
+        self.locator.logging = True
         while not self._is_at_position(x, y):
             # get relative angle to
             d_theta = self.position.get_rel_angle_to(self.position.get_abs_angle_to(x, y))
@@ -85,6 +85,8 @@ class WallE:
             self.drive.at_speed(self.speed_r, self.speed_l)
 
             time.sleep(self.EVAL_POSITION)  # reevaluate every .2 sec
+
+        self.locator.logging = False
 
     def drive_path(self, waypoints):
         """
@@ -160,7 +162,7 @@ class WallE:
 
     class DriveModel():
         """Abstraction for driving the robot. Converts velocities to power settings."""
-        BASE_POWER = 0.5
+        BASE_POWER = 0.25
         R_L_OFFSET = 0.035
         SPEED_PWR_RATIO = 0.0209
         BASE_SPEED = BASE_POWER / SPEED_PWR_RATIO
@@ -219,23 +221,23 @@ class WallE:
             :param speed_r: Right Wheel speed (cm/s)
             :param speed_l: Left Wheel speed (cm/s)
             """
-            print("--drive: at speed {} {}".format(speed_r, speed_l))
+#             print("--drive: at speed {} {}".format(speed_r, speed_l))
             self._set_speed(speed_r, speed_l)
 
         def forward(self):
-            print("--drive: forward")
+#             print("--drive: forward")
             self._set_speed(self.BASE_SPEED, self.BASE_SPEED)
 
         def right(self):
-            print("--drive: right")
+#             print("--drive: right")
             self._set_speed(self.BASE_SPEED, -self.BASE_SPEED)
 
         def left(self):
-            print("--drive: left")
+#             print("--drive: left")
             self._set_speed(-self.BASE_SPEED, self.BASE_SPEED)
 
         def stop(self):
-            print("--drive: stop")
+#             print("--drive: stop")
             self.speed_l = 0.0
             self.speed_r = 0.0
             self.robot.stop()
@@ -247,7 +249,7 @@ class WallE:
         """Model path planning and movement"""
         # WHEEL_CIRCUMFERENCE = 0.215  # cm
         WHEEL_SEPARATION = 13.1 # W (cm)
-        MAX_SPEED = 12.0    # maximum wheel speed in cm/s
+        MAX_SPEED = 15.0    # maximum wheel speed in cm/s
         RAD_90 = math.pi / 2
 
         def calibrate(self, drive_model):
