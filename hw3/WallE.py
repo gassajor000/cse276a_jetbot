@@ -162,7 +162,7 @@ class WallE:
 
     class DriveModel():
         """Abstraction for driving the robot. Converts velocities to power settings."""
-        BASE_POWER = 0.25
+        BASE_POWER = 0.35
         R_L_OFFSET = 0.035
         SPEED_PWR_RATIO = 0.0209
         BASE_SPEED = BASE_POWER / SPEED_PWR_RATIO
