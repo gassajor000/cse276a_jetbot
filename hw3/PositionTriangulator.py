@@ -54,7 +54,7 @@ class PositionTriangulator():
     def get_position_from_landmarks(self, landmark_dists, estimated_position):
         """
         Estimate the position using relative distances to landmarks.
-        :param landmark_dists: list of tuples containing a landmark and a distance measurement.
+        :param landmark_dists: list of tuples containing the landmark's location and the distance measurement.
         :param estimated_position: (x, y) of the robot's estimated position
         :return: tuple, ((x, y), confidence) of estimated position
         """
@@ -130,7 +130,7 @@ class PositionTriangulator():
     def get_orientation_from_landmarks(self, landmark_thetas, position):
         """
         Find the orientation from the detected landmarks and detected position
-        :param landmark_dists: list of tuples containing a landmark and the robot's orientation offset from the landmark
+        :param landmark_thetas: list of tuples containing a landmark and the robot's orientation offset from the landmark
         :param position: (x,y) position returned from get_position_from_landmarks()
         :return: global orientation (theta) in radians
         """

@@ -131,8 +131,11 @@ class PositionDetector:
                 print("No landmarks detected")
             return self.filter.x    # Couldn't find any landmarks. Just use the prediction.
 
-        landmark_distances = list(map(lambda pair: self.detector.get_distance_to_landmark(pair[0], pair[1]), landmark_detections.values()))
-        landmark_angles = list(map(lambda pair: self.detector.get_angle_offset_to_landmark(pair[0], pair[1]), landmark_detections.values()))
+        landmark_distances = []
+        landmark_angles = []
+        for lmk, det in landmark_detections.values():
+            landmark_distances.append((lmk.position, self.detector.get_distance_to_landmark(lmk, det)))
+            landmark_angles.append((lmk, self.detector.get_angle_offset_to_landmark(det)))
 
         x1, y1, confidence = self.locator.get_position_from_landmarks(landmark_distances, tuple(self.filter.x))
         theta = self.locator.get_orientation_from_landmarks(landmark_angles, tuple(self.filter.x))
