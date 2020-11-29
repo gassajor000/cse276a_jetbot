@@ -27,6 +27,8 @@ class WallE:
         self.updateTimer = self.UpdateThread(self.UPDATE_DT, self.updatePosition)     # update position every 20 ms
         self.updateTimer.start()
 
+        self.drive.stop()   # Kill any previous drive commands
+
     def drive_to(self, x, y, theta):
         """
         while not @ x,y:
@@ -43,21 +45,21 @@ class WallE:
             turn to theta
             evaluate position.theta
         """
+        self.locator.logging = True
         while not self._is_at_position(x, y):
             # get angle to rotate towards x, y
             theta_drive = self.position.get_abs_angle_to(x, y)
             print("Turn to {:.2f}".format(theta_drive))
-            while not self._is_oriented_towards(theta_drive):
-                # rotate towards x,y
-                self._turn_to_theta(theta_drive)
+            # rotate towards x,y
+            self._turn_to_theta(theta_drive)
 
             # drive forward to x, y
             self._drive_to_x_y(x, y)
             self.drive.stop()
 
         # rotate to theta
-        while not self._is_oriented_towards(theta):
-            self._turn_to_theta(theta)
+        self._turn_to_theta(theta)
+        self.locator.logging = False
 
     def _drive_to_x_y(self, x, y):
         """
@@ -100,7 +102,7 @@ class WallE:
     def updatePosition(self):
         speed_r, speed_l = self.drive.get_current_speed()
         v, omega = self.movement.get_current_v_omega(speed_r, speed_l)
-        print("v: {:.4f} w: {:.4f}".format(v, omega))
+#         print("speed_r: {:.4f} speed_l: {:.4f}".format(speed_r, speed_l))
         new_pos = self.locator.get_position(v / 100.0, omega, self.UPDATE_DT)
         self.position.set_position(new_pos[0], new_pos[1], new_pos[2])
 
@@ -229,6 +231,8 @@ class WallE:
 
         def stop(self):
             print("--drive: stop")
+            self.speed_l = 0.0
+            self.speed_r = 0.0
             self.robot.stop()
 
         def get_current_speed(self):
@@ -295,7 +299,7 @@ class WallE:
             if vr == vl:    # if speeds are the same, we are going straight (not turning)
                 return vr, 0.0
             elif vr == -vl: # special case, rotating in place. r = w/2, v = vr
-                return 0.0, vr / (self.WHEEL_SEPARATION / 2) * 0.8     # Seems to rotate slower than predicted wheel velocities
+                return 0.0, vr / (self.WHEEL_SEPARATION / 2) * 0.7     # Seems to rotate slower than predicted wheel velocities
 
             vo, vi = (vr, vl) if vr > vl else (vl, vr)
             r = self._get_turn_radius(vo, vi)

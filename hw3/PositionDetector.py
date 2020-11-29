@@ -59,7 +59,7 @@ class PositionDetector:
             [0., 0., 0., 0., 1. ],
         ])
         self.filter = KalmanFilter(dim_x=5, dim_z=3)
-        self.filter.x = numpy.array([[init_pos[0], init_pos[1], init_pos[2], initial_v, initial_omega]])
+        self.filter.x = numpy.array([init_pos[0], init_pos[1], init_pos[2], initial_v, initial_omega])
         self.filter.F = ident
         self.filter.H = ident
         self.filter.P = ident * 5
@@ -72,10 +72,6 @@ class PositionDetector:
             [1, 0],
             [0, 1],
         ])
-
-        self.detector = LandmarkDetector(model=model)
-        self.locator = PositionTriangulator(self.MEASUREMENT_NOISE, self.ESTIMATION_PROXIMITY)
-        self.camera = Camera(camera_instance)
         self.logging = False
 
     def calibrate(self, file_path='images/'):
@@ -115,7 +111,8 @@ class PositionDetector:
         # predict
         self.filter.predict(u=numpy.array([velocity, omega]), F=self._make_F_matrix(dt))
         self.wrap_theta()
-        print("Predicted Position ({:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
+        if self.logging:
+            print("Predicted Position ({:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         image = self.camera.get_image()
         landmark_detections = self.detector.detect_landmarks(image)
@@ -130,8 +127,8 @@ class PositionDetector:
         theta = self.locator.get_orientation_from_landmarks(landmark_angles, tuple(self.filter.x))
         print("Computed Position ({:.3f}, {:.3f}, {:.3f})".format(x1, y1, theta))
 
-        self.filter.update(z=(x1, y1, theta))
-        self.wrap_theta()
-        print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
+#         self.filter.update(z=(x1, y1, theta))
+#         if self.logging:
+#           print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         return self.filter.x
