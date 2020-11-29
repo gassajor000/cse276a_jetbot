@@ -18,12 +18,12 @@ class LandmarkDetector():
             self.position = position
 
     # Landmark positions & classes
-    LANDMARKS = {44: Landmark((0,0), 22.5, 'landmark 0 [olive oil]', 'bottle', 44),
-                 53: Landmark((0,0), 7.5, 'landmark 1 [apple]', 'apple', 53),
-                 32: Landmark((0,0), 150, 'landmark 2 [tie]', 'tie', 32),
-                 51: Landmark((0,0), 11.5, 'landmark 3 [bowl]', 'bowl', 51),
-                 13: Landmark((0,0), 23.0, 'landmark 4 [stop sign]', 'stop sign', 32),
-                 85: Landmark((0,0), 13.6, 'landmark 5 [clock]', 'clock', 85)}
+    LANDMARKS = {44: Landmark((0.65,1.0), 22.5, 'landmark 0 [olive oil]', 'bottle', 44),
+                 53: Landmark((1.46,1.0), 7.5, 'landmark 1 [apple]', 'apple', 53),
+                 32: Landmark((0.26,-0.66), 60.0, 'landmark 2 [tie]', 'tie', 32),
+                 51: Landmark((1.45,0), 11.5, 'landmark 3 [bowl]', 'bowl', 51),
+                 13: Landmark((1.0,0.39), 23.0, 'landmark 4 [stop sign]', 'stop sign', 32),
+                 85: Landmark((0,0.54), 13.6, 'landmark 5 [clock]', 'clock', 85)}
 
     CAMERA_OFFSET = 2.0  # cm between the camera and the position model point
     FOCAL_LENGTH = .159     # 1.59 mm
