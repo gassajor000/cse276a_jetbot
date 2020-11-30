@@ -26,7 +26,7 @@ class LandmarkDetector():
     LANDMARKS = {}
 
     CAMERA_OFFSET = 2.0  # cm between the camera and the position model point
-    FOCAL_LENGTH = .159     # 1.59 mm
+    FOCAL_LENGTH = .178     # 1.78 mm
     PIXEL_SIZE = 0.0009199   # (cm) 9.199 um /pixel
     RAD_PER_PIXEL = math.radians(136) / 300   # degrees offset from straight on per pixel offset
 
