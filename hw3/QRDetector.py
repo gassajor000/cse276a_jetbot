@@ -22,7 +22,7 @@ class QRDetector(LandmarkDetector):
     def calibrate(self, get_image_func):
         print('Beginning QR Detector Calibration')
         import time
-        lmk = self.LANDMARKS['code 0']
+        lmk = self.LANDMARKS[b'code 0']
         focal_lengths = []
 
         for d in [0.25, 0.5, 1.0, 1.25]:
