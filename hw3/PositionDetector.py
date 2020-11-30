@@ -6,7 +6,7 @@ from filterpy.kalman import KalmanFilter
 import numpy
 
 from Camera import Camera
-from LandmarkDetector import LandmarkDetector
+from QRDetector import QRDetector
 from PositionTriangulator import PositionTriangulator
 
 
@@ -79,7 +79,7 @@ class PositionDetector:
         ])
         self.logging = False
 
-        self.detector = LandmarkDetector(model=model)
+        self.detector = QRDetector()
         self.locator = PositionTriangulator(self.MEASUREMENT_NOISE, self.ESTIMATION_PROXIMITY)
         self.camera = Camera(camera_instance)
 
