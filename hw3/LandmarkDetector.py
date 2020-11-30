@@ -43,13 +43,13 @@ class LandmarkDetector():
 
     def get_height_on_sensor(self, detection:Detection):
         """Return the height of the detection on the sensor in cm"""
-        height_pixels = abs(detection.y1 - detection.y2) * 300    # Scale to height of image
+        height_pixels = abs(detection.y1 - detection.y2)  # Scale to height of image
 #             print("{} pixels high. bbox {}".format(height_pixels, detection['bbox']))
         return self.PIXEL_SIZE * height_pixels
 
     def get_offset_from_center(self, detection: Detection):
         """Return the number of pixels detection is offset from center. Positive = right/ negative = left"""
-        obj_center = ((detection.x1 + detection.x2) / 2.0) * 300
+        obj_center = ((detection.x1 + detection.x2) / 2.0)
 #             print(obj_center)
         return obj_center - 150
 

@@ -2,10 +2,9 @@
     created by Jordan Gassaway, 11/25/2020
     LandmarkDetector: Detects landmarks in an image
 """
-import math
 import numpy
 
-from hw3.LandmarkDetector import LandmarkDetector
+from LandmarkDetector import LandmarkDetector
 from jetbot import ObjectDetector
 
 
@@ -61,9 +60,10 @@ class LMObjectDetector(LandmarkDetector):
 
     def detect_landmarks(self, image):
         objs = self.model(image)[0]
-        detections = [LandmarkDetector.Detection(obj['bbox'], obj['label']) for obj in objs]
         landmarks = {}
-        for det in detections:
+        for obj in objs:
+            bbox = tuple(c * 300 for c in obj['bbox'])
+            det = LandmarkDetector.Detection(bbox,  obj['label'])
             lmk = self._get_landmark(det)
             if lmk is not None:
                 landmarks[lmk.label] = ((lmk, det))
