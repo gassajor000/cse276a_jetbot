@@ -5,15 +5,16 @@
 from LandmarkDetector import LandmarkDetector
 
 from pyzbar.pyzbar import decode
+from pyzbar.wrapper import ZBarSymbol
 
 
 class QRDetector(LandmarkDetector):
-    LANDMARKS = {'code 0': LandmarkDetector.Landmark((0.65,1.0), 22.5, 'landmark 0 (code0)', 'bottle', 'code 0'),
-                 'code 1': LandmarkDetector.Landmark((1.46,1.0), 7.5, 'landmark 0 (code1)', 'apple', 'code 1'),
-                 'code 2': LandmarkDetector.Landmark((0.26,-0.66), 60.0, 'landmark 0 (code2)', 'tie', 'code 2'),
-                 'code 3': LandmarkDetector.Landmark((1.45,0), 11.5, 'landmark 0 (code3)', 'bowl', 'code 3'),
-                 'code 4': LandmarkDetector.Landmark((1.0,0.39), 23.0, 'landmark 0 (code4)', 'stop sign', 'code 4'),
-                 'code 5': LandmarkDetector.Landmark((0,0.54), 13.6, 'landmark 0 (code5)', 'clock', 'code 5')}
+    LANDMARKS = {b'code 0': LandmarkDetector.Landmark((0.65,1.0), 16.0, 'landmark 0 (code0)', 'bottle', b'code 0'),
+                 b'code 1': LandmarkDetector.Landmark((1.46,1.0), 16.0, 'landmark 1 (code1)', 'apple', b'code 1'),
+                 b'code 2': LandmarkDetector.Landmark((0.26,-0.66), 16.0, 'landmark 2 (code2)', 'tie', b'code 2'),
+                 b'code 3': LandmarkDetector.Landmark((1.45,0), 16.0, 'landmark 3 (code3)', 'bowl', b'code 3'),
+                 b'code 4': LandmarkDetector.Landmark((1.0,0.39), 16.0, 'landmark 4 (code4)', 'stop sign', b'code 4'),
+                 b'code 5': LandmarkDetector.Landmark((0,0.54), 16.0, 'landmark 5 (code5)', 'clock', b'code 5')}
 
     def __init__(self):
         pass
@@ -51,7 +52,8 @@ class QRDetector(LandmarkDetector):
             x2, y2 = x1 + code.rect.width, y1 + code.rect.height
             return (x1, y1, x2, y2)
 
-        codes = decode(image)
+        codes = decode(image, symbols=[ZBarSymbol.QRCODE])
+#         print("codes: ", codes)
 
         detections = [LandmarkDetector.Detection(get_bbox(code), code.data) for code in codes]
         landmarks = {}
