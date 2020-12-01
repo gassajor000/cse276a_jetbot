@@ -104,7 +104,9 @@ class Camera:
 
     def get_image(self):
         """Returns an undistorted image from the camera"""
-        return self.undistort_image(self.camera_instance.value)
+        img = self.undistort_image(self.camera_instance.value)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # convert to grayscale
+        return gray
 
     def get_instance(self):
         return self.camera_instance
