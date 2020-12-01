@@ -16,7 +16,7 @@ from threading import Thread, Event
 class WallE:
     ERROR_THETA = math.radians(10)  # 10 deg
     ERROR_DISTANCE = 0.1    # 10 cm
-    UPDATE_DT = 0.15        # 20 ms
+    UPDATE_DT = 0.2        # 20 ms
     EVAL_POSITION = 0.05    # 50 ms
 
     def __init__(self):

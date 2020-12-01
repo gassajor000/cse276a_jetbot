@@ -90,4 +90,10 @@ class LandmarkDetector():
         """
         return self.get_offset_from_center(detection) * self.RAD_PER_PIXEL
 
+    def get_num_landmarks(self):
+        """Returns the number of landmarks registered to the detector"""
+        return len(self.LANDMARKS)
 
+    def get_landmark_labels(self):
+        """Returns a list of all the landmark labels"""
+        return self.LANDMARKS.keys()
