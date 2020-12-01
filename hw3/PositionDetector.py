@@ -217,3 +217,6 @@ class PositionDetector:
                 z_vec[k+1] = 0.0
 
         return z_vec
+
+    def dump_x(self):
+        print(self.filter.x)

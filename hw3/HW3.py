@@ -6,20 +6,23 @@ import time
 
 from WallE import WallE
 
-def drive_to_waypoints(walle):
+def drive_to_waypoints(file_name):
+
     # open way points file
     waypoints = []
     with open('circle_path.txt') as fl:
         for line in fl.readlines():
             if line != '' and line != ' ':
-                x, y, theta = line.split(',')
-                waypoints.append((float(x), float(y), float(theta)))
+                x, y, = line.split(',')
+                waypoints.append((float(x), float(y)))
 
-    for point in waypoints:
-        x, y, theta = point
-        walle.drive_to(x, y, theta)
-        time.sleep(1)
-
+    walle = WallE(init_pos=waypoints[0])
+    try:
+        input("Please move WallE to ({:.2f}, {:.2f}, 0.00) and press enter".format(*waypoints[0]))
+        walle.drive_path(waypoints)
+        walle.locator.dump_x()
+    finally:
+        walle.close()
 
 def take_images():
     def save_image(image):
@@ -43,16 +46,6 @@ def take_images():
 if __name__ == '__main__':
     # take_images()
 
-    W = WallE()
-    try:
-        # W.calibrate()
-        W.drive_to(1, 0, 0)
-        time.sleep(1)
-        W.drive_to(1, 1, 3.14)
-        time.sleep(1)
-        W.drive_to(2, 1, 0)
-
-        drive_to_waypoints(W)
-    finally:
-        W.close()
+    drive_to_waypoints('circle_path.txt')
+    drive_to_waypoints('figure_eight_path.txt')
 

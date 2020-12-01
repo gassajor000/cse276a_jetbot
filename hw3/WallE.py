@@ -19,13 +19,13 @@ class WallE:
     UPDATE_DT = 0.2        # 20 ms
     EVAL_POSITION = 0.05    # 50 ms
 
-    def __init__(self):
+    def __init__(self, init_pos=(0.0, 0.0, 0.0)):
         self.drive = self.DriveModel()
         self.drive.stop()   # Kill any previous drive commands
         self.position = PositionModel()
         self.movement = self.MovementModel()
 
-        self.locator = PositionDetector()
+        self.locator = PositionDetector(init_pos=init_pos)
         self.updateTimer = self.UpdateThread(self.UPDATE_DT, self.updatePosition)     # update position every 20 ms
         self.updateTimer.start()
 
