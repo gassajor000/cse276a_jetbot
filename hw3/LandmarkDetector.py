@@ -96,4 +96,4 @@ class LandmarkDetector():
 
     def get_landmark_labels(self):
         """Returns a list of all the landmark labels"""
-        return self.LANDMARKS.keys()
+        return list(self.LANDMARKS.keys())

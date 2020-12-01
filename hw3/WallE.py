@@ -94,11 +94,13 @@ class WallE:
         :param waypoints list of (x, y) coordinates
         """
         # turn towards first point and start driving
-        self._turn_to_theta(self.position.get_abs_angle_to(*waypoints[0]))
-        self.drive.forward()
+        # self._turn_to_theta(self.position.get_abs_angle_to(*waypoints[0]))
+        # self.drive.forward()
 
         for point in waypoints:
             self._drive_to_x_y(*point)
+            self.drive.stop()
+            time.sleep(1)
 
         self.drive.stop()
 
@@ -163,8 +165,8 @@ class WallE:
     class DriveModel():
         """Abstraction for driving the robot. Converts velocities to power settings."""
         BASE_POWER = 0.35
-        R_L_OFFSET = 0.035
-        SPEED_PWR_RATIO = 0.0209
+        R_L_OFFSET = 0.012
+        SPEED_PWR_RATIO = 0.022
         BASE_SPEED = BASE_POWER / SPEED_PWR_RATIO
 
         def __init__(self):
@@ -221,7 +223,7 @@ class WallE:
             :param speed_r: Right Wheel speed (cm/s)
             :param speed_l: Left Wheel speed (cm/s)
             """
-#             print("--drive: at speed {} {}".format(speed_r, speed_l))
+            # print("--drive: at speed {} {}".format(speed_r, speed_l))
             self._set_speed(speed_r, speed_l)
 
         def forward(self):
@@ -249,7 +251,8 @@ class WallE:
         """Model path planning and movement"""
         # WHEEL_CIRCUMFERENCE = 0.215  # cm
         WHEEL_SEPARATION = 13.1 # W (cm)
-        MAX_SPEED = 15.0    # maximum wheel speed in cm/s
+        MIN_SPEED = 18.0    # minimum wheel speed in cm/s
+        MAX_SPEED = 24.0    # maximum wheel speed in cm/s
         RAD_90 = math.pi / 2
 
         def calibrate(self, drive_model):
@@ -261,7 +264,7 @@ class WallE:
             drive_model.stop()
             # enter distance traveled
             dist = float(input("Enter cm traveled: "))
-            self.MAX_SPEED = dist
+            self.MIN_SPEED = dist
 
         def arc_to(self, x, y, position: PositionModel):
             """
@@ -273,7 +276,8 @@ class WallE:
             left_turn = turn_theta > 0
 
             if abs(turn_theta) > self.RAD_90: # just turn sharply instead of computing an arc.
-                v_outer, v_inner = self.MAX_SPEED, 1.0
+                v_outer, v_inner = self.MAX_SPEED, self.MIN_SPEED
+                print('turn ' + 'left' if left_turn else 'right')
                 return (v_outer, v_inner, math.pi) if left_turn else (v_inner, v_outer, -math.pi)
 
             sec_theta = self.RAD_90 - abs(turn_theta)
@@ -283,9 +287,10 @@ class WallE:
             w = self.WHEEL_SEPARATION
             d_outer = (radius + w/2) * arc_theta
             d_inner = (radius - w/2) * arc_theta
-            dt = (d_outer / self.MAX_SPEED)  # time to travers the arc
+            dt = (d_inner / self.MIN_SPEED)  # time to travers the arc
 
             v_r, v_l = (d_outer/dt, d_inner/dt) if left_turn else (d_inner/dt, d_outer/dt)
+            print('arc r={} theta={}'.format(radius, turn_theta))
             return v_r, v_l, arc_theta
 
         def _get_turn_radius(self, vo, vi):
@@ -311,5 +316,17 @@ class WallE:
             vo, vi = (vr, vl) if vr > vl else (vl, vr)
             r = self._get_turn_radius(vo, vi)
             v = self._get_velocity(vi, r)
+            dir = 1.0 if vr > vl else -1.0
+            return v, dir * v / r
 
-            return v, v / r
+        def arc_with_r(self, r):
+            left_turn = r > 0
+            radius = abs(r)
+
+            w = self.WHEEL_SEPARATION
+            d_outer = (radius + w / 2) * 2 * math.pi
+            d_inner = (radius - w / 2) * 2 * math.pi
+            dt = (d_inner / self.MIN_SPEED)  # time to travers the arc
+
+            v_r, v_l = (d_outer / dt, d_inner / dt) if left_turn else (d_inner / dt, d_outer / dt)
+            return v_r, v_l

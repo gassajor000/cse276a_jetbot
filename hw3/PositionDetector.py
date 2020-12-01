@@ -76,13 +76,15 @@ class PositionDetector:
         self.num_landmarks = self.detector.get_num_landmarks()
         # keep an ordered list of the landmarks to keep track of their order in the x matrix
         self.landmarks_ids = self.detector.get_landmark_labels()
+        self.found_landmarks = []
         self.num_vars = self.NUM_KINEMATIC_VARS + 2* self.num_landmarks   # (x, y, theta, v, omega, (x,y) for each landmark)
 
         # setup kalman filter
         self.filter = KalmanFilter(dim_x=self.num_vars, dim_z=self.num_landmarks*2)
         init_x = numpy.zeros(self.num_vars, dtype=float)
         init_x[0], init_x[1], init_x[2] = init_pos[0], init_pos[1], init_pos[2]
-        self.filter.x = numpy.array(init_x)
+        print('init x {} init pos {}'.format(init_x, init_pos))
+        self.filter.x = init_x
 
         ident = numpy.eye(self.num_vars)
         self.filter.P = ident * .25
@@ -163,24 +165,30 @@ class PositionDetector:
         self.filter.predict(u=numpy.array([velocity, omega]), B=self._get_B_matrix(dt), Q=self._get_Q_matrix(dt))
         self.wrap_theta()
         if self.logging:
-            print("Predicted Position ({:.3f}, {:.3f}, {:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
+            print("Predicted Position ({:.3f}, {:.3f}, {:.3f}) [{:.3f}, {:.3f}]".format(self.filter.x[0], self.filter.x[1],
+                                                                                        self.filter.x[2], velocity, omega))
 
         image = self.camera.get_image()
         landmark_detections = self.detector.detect_landmarks(image)
 
         if not landmark_detections:
-            if self.logging:
-                print("No landmarks detected")
             return self.filter.x    # Couldn't find any landmarks. Just use the prediction.
 
         measurements = []
-        for i in range(self.landmarks_ids):
+        for i in range(self.num_landmarks):
             lmk_id = self.landmarks_ids[i]
             if lmk_id in landmark_detections:
                 lmk, det = landmark_detections[lmk_id]
-                d = (lmk.position, self.detector.get_distance_to_landmark(lmk, det))
-                phi = lmk, self.detector.get_angle_offset_to_landmark(det)
+                d = self.detector.get_distance_to_landmark(lmk, det)
+                phi = self.detector.get_angle_offset_to_landmark(det)
                 measurements.append((d, phi))
+
+                if lmk_id not in self.found_landmarks:  # set an initial position first
+                    x, y = self.get_x_y_from_d_phi(d, phi)
+                    k = i*2
+                    self.filter.x[self.NUM_KINEMATIC_VARS+k] = x + self.filter.x[0]
+                    self.filter.x[self.NUM_KINEMATIC_VARS+k+1] = y + self.filter.x[1]
+                    self.found_landmarks.append(lmk_id)
             else:
                 measurements.append(None)   # Landmark was not detected
 
@@ -193,23 +201,22 @@ class PositionDetector:
 
         return self.filter.x
 
+    def get_x_y_from_d_phi(self, d, phi):
+        theta = self.filter.x[2]
+        return -d *numpy.sin(theta + phi), d *numpy.cos(theta + phi)
+
     def get_z_vector(self, d_phi_measurements):
         """
         Produce a z vector from a list of (d, phi) measurements for the landmarks.
         :param d_phi_measurements: list of d, phi measurements for each landmark
         :return: 2x 2* num_landmarks vector of x,y positions, relative to the robot.
         """
-        theta = self.filter.x[2]
-
-        def get_x_y(d, phi):
-            return -d *numpy.sin(theta + phi), d *numpy.cos(theta + phi)
-
         z_vec = numpy.zeros(2*self.num_landmarks, dtype=numpy.float)
         for i in range(self.num_landmarks):
             k = i*2
             if d_phi_measurements[i] is not None:
                 d, phi = d_phi_measurements[i]
-                x, y = get_x_y(d, phi)
+                x, y = self.get_x_y_from_d_phi(d, phi)
                 z_vec[k] = x
                 z_vec[k+1] = y
             else: # Nulled out by H anyways

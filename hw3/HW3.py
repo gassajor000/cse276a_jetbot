@@ -10,13 +10,14 @@ def drive_to_waypoints(file_name):
 
     # open way points file
     waypoints = []
-    with open('circle_path.txt') as fl:
+    with open(file_name) as fl:
         for line in fl.readlines():
             if line != '' and line != ' ':
-                x, y, = line.split(',')
+                x, y, r = line.split(',')
                 waypoints.append((float(x), float(y)))
 
-    walle = WallE(init_pos=waypoints[0])
+    pos = (waypoints[0][0], waypoints[0][1], 0.00)
+    walle = WallE(init_pos=pos)
     try:
         input("Please move WallE to ({:.2f}, {:.2f}, 0.00) and press enter".format(*waypoints[0]))
         walle.drive_path(waypoints)
@@ -46,6 +47,6 @@ def take_images():
 if __name__ == '__main__':
     # take_images()
 
-    drive_to_waypoints('circle_path.txt')
+#     drive_to_waypoints('circle_path.txt')
     drive_to_waypoints('figure_eight_path.txt')
 
