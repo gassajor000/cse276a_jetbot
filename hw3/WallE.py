@@ -62,7 +62,7 @@ class WallE:
         self._turn_to_theta(theta)
         self.locator.logging = False
 
-    def _drive_to_x_y(self, x, y):
+    def _drive_to_x_y(self, x, y, r=None):
         """
         Drive to an (x, y) point assuming a current velocity and angular velocity.
         Adjusts wheel speeds rather than explicitly turning/driving forward.
@@ -76,13 +76,9 @@ class WallE:
             # if off by less than 10 deg, drive forward
             if abs(d_theta) < math.radians(self.ERROR_THETA):
                 self.drive.forward()
-            elif d_theta > 0:   # if to the left, compute left arc
-                pass
-            else: # if right, compute right arc
-                pass
-
-            self.speed_r, self.speed_l, _ = self.movement.arc_to(x, y, self.position)
-            self.drive.at_speed(self.speed_r, self.speed_l)
+            else:    # if to the left, compute left arc
+                self.speed_r, self.speed_l, _ = self.movement.arc_to(x, y, self.position)
+                self.drive.at_speed(self.speed_r, self.speed_l)
 
             time.sleep(self.EVAL_POSITION)  # reevaluate every .2 sec
 
@@ -251,7 +247,7 @@ class WallE:
         """Model path planning and movement"""
         # WHEEL_CIRCUMFERENCE = 0.215  # cm
         WHEEL_SEPARATION = 13.1 # W (cm)
-        MIN_SPEED = 18.0    # minimum wheel speed in cm/s
+        MIN_SPEED = 20.0    # minimum wheel speed in cm/s
         MAX_SPEED = 24.0    # maximum wheel speed in cm/s
         RAD_90 = math.pi / 2
 
@@ -277,7 +273,7 @@ class WallE:
 
             if abs(turn_theta) > self.RAD_90: # just turn sharply instead of computing an arc.
                 v_outer, v_inner = self.MAX_SPEED, self.MIN_SPEED
-                print('turn ' + 'left' if left_turn else 'right')
+                # print('turn ' + 'left' if left_turn else 'right')
                 return (v_outer, v_inner, math.pi) if left_turn else (v_inner, v_outer, -math.pi)
 
             sec_theta = self.RAD_90 - abs(turn_theta)
@@ -290,7 +286,7 @@ class WallE:
             dt = (d_inner / self.MIN_SPEED)  # time to travers the arc
 
             v_r, v_l = (d_outer/dt, d_inner/dt) if left_turn else (d_inner/dt, d_outer/dt)
-            print('arc r={} theta={}'.format(radius, turn_theta))
+            # print('arc r={} theta={}'.format(radius, turn_theta))
             return v_r, v_l, arc_theta
 
         def _get_turn_radius(self, vo, vi):

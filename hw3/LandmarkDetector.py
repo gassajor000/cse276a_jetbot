@@ -51,7 +51,7 @@ class LandmarkDetector():
         """Return the number of pixels detection is offset from center. Positive = right/ negative = left"""
         obj_center = ((detection.x1 + detection.x2) / 2.0)
 #             print(obj_center)
-        return obj_center - 150
+        return 150 - obj_center
 
     def detect_landmarks(self, image):
         """
@@ -86,7 +86,7 @@ class LandmarkDetector():
         """
         Get the angle offset from the direction the robot is looking to the object
         :param detection: object detection returned from jetbot Object Detector
-        :return: offset (radians). Positive = right, Negative = left
+        :return: offset (radians). Positive = left, Negative = right
         """
         return self.get_offset_from_center(detection) * self.RAD_PER_PIXEL
 

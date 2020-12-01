@@ -178,6 +178,7 @@ class PositionDetector:
         for i in range(self.num_landmarks):
             lmk_id = self.landmarks_ids[i]
             if lmk_id in landmark_detections:
+                print('Detected {}'.format(lmk_id))
                 lmk, det = landmark_detections[lmk_id]
                 d = self.detector.get_distance_to_landmark(lmk, det)
                 phi = self.detector.get_angle_offset_to_landmark(det)
@@ -226,4 +227,5 @@ class PositionDetector:
         return z_vec
 
     def dump_x(self):
+        print(self.landmarks_ids)
         print(self.filter.x)
