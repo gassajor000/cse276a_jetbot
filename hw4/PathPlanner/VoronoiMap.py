@@ -9,6 +9,7 @@ from scipy.spatial import Voronoi
 
 from . import Point
 
+PI_2 = 2 * math.pi
 
 class VoronoiMap:
     vertices = []  # type: List[Point]
@@ -54,8 +55,13 @@ class VoronoiMap:
             """returns angle between two points and the origin (center) point"""
             theta1 = math.atan2(p1.y - origin.y, p1.x - origin.x)
             theta2 = math.atan2(p2.y - origin.y, p2.x - origin.x)
-            d_theta = abs(theta2 - theta1)
-            return d_theta % (math.pi * 2)
+            d_theta = theta2 - theta1
+            if d_theta < -math.pi:
+                d_theta += PI_2
+            elif d_theta > math.pi:
+                d_theta -= PI_2
+
+            return d_theta
 
         def inside_polygon(pol: List[Point], p: Point):
             """returns true if p is inside the polygon.
@@ -65,7 +71,7 @@ class VoronoiMap:
             for i in range(n):
                 angle_sum += angle_btw_points(p, pol[i], pol[(i+1) % n])
 
-            return angle_sum >= math.pi
+            return abs(angle_sum) >= math.pi
 
         # find invalid vertices (inside an obstacle)
         for i in range(len(self.vertices)):
@@ -78,7 +84,7 @@ class VoronoiMap:
         # remove edges that connect to an invalid vertex
         for edge in self.graph.ridge_vertices:
             # finite-valid vertices only
-            if -1 not in edge and edge[0] not in invalid_vertices or edge[1] not in invalid_vertices:
+            if -1 not in edge and edge[0] not in invalid_vertices and edge[1] not in invalid_vertices:
                 self.ridge_vertices.append((self.vertices[edge[0]], self.vertices[edge[1]]))
 
         # remove invalid vertices
