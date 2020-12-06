@@ -4,7 +4,7 @@
     on a Voronoi representation of the space.
 """
 import math
-from typing import List
+from typing import List, Tuple, Dict
 from scipy.spatial import Voronoi
 
 from . import Point
@@ -13,7 +13,8 @@ PI_2 = 2 * math.pi
 
 class VoronoiMap:
     vertices = []  # type: List[Point]
-    ridge_vertices = []  # type: List[tuple[Point]]
+    ridge_vertices = []  # type: List[Tuple[Point, Point]]
+    graph = {}          # type: Dict[Point: List[Point]]
     FILL_DENSITY = 8
 
     def __init__(self, boundaries: List[Point], obstacles: List[List[Point]]):
@@ -28,7 +29,7 @@ class VoronoiMap:
             all_points += obstacle
 
         self.graph = Voronoi(all_points, incremental=True)
-        self._prune_blocked_paths()
+        self._make_graph()
 
     def _fill_edge_with_points(self, p1, p2):
         dx = (p2[0] - p1[0]) / self.FILL_DENSITY
@@ -46,7 +47,7 @@ class VoronoiMap:
             fill_points += self._fill_edge_with_points(b1, b2)
         return fill_points
 
-    def _prune_blocked_paths(self):
+    def _make_graph(self):
         self.vertices = list(map(lambda v: Point(v[0], v[1]),self.graph.vertices))
         self.ridge_vertices = []
         invalid_vertices = []      # vertices inside the obstacles
@@ -92,6 +93,12 @@ class VoronoiMap:
         for v in tmp_vertices:
             self.vertices.remove(v)
 
+        # Assemble all the edges into a graph
+        self.graph = {p: [] for p in self.vertices}
+        for edge in self.ridge_vertices:
+            self.graph[edge[0]].append(edge[1])
+            self.graph[edge[1]].append(edge[0])
+
     def add_obstacle(self, obstacle: List[Point]):
         """
         Add an obstacle to the map
@@ -99,7 +106,49 @@ class VoronoiMap:
         """
         obstacle_points = self._fill_polygon(obstacle)
         self.graph.add_points(obstacle_points)
-        self._prune_blocked_paths()
+        self._make_graph()
+
+    def _get_closest_vertex(self, p: Point):
+        """get the closest vertex to a point"""
+        def dist(p1, p2):
+            return math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2)
+
+        min_d = None
+        closest = None
+        for vertex in self.vertices:
+            d = dist(p, vertex)
+            if min_d is None or d < min_d:
+                min_d = d
+                closest = vertex
+
+        return closest
+
+    def find_path_to(self, start: Point, end: Point, visited_nodes: List[Point]=None) -> List[Point]:
+        """
+        Find a path from start to end vertices
+        :param start: starting vertex
+        :param end: ending vertex
+        :return: path from start to end, None if path does not exist.
+        """
+        if end is start:
+            return [end]
+
+        if visited_nodes is None:
+            visited_nodes = []
+
+        for next_v in self.graph[start]:
+            if next_v in visited_nodes: # already been here
+                continue
+            visited_nodes_copy = visited_nodes.copy()
+            visited_nodes_copy.append(start)
+            path = self.find_path_to(next_v, end, visited_nodes_copy)
+
+            if path:
+                path.insert(0, start)
+                return path
+
+        return None
+
 
     def plot(self):
         """plot using pyplot"""
