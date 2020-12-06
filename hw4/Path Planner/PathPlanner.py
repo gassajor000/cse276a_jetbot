@@ -4,11 +4,12 @@
 """
 from typing import List
 
-from hw4.VoronoiMap import VoronoiMap, Node
+from .VoronoiMap import VoronoiMap
+from . import Point
 
 
 class PathPlanner:
-    def __init__(self, boundary_points: List[Node], obstacles: List[List[Node]]):
+    def __init__(self, boundary_points: List[Point], obstacles: List[List[Point]]):
         """
         Initialize Path Planner
         :param boundary_points: list of (x, y) points enclosing the workspace of the robot.
@@ -16,7 +17,7 @@ class PathPlanner:
         """
         self.map = VoronoiMap(boundary_points, obstacles)
 
-    def getPath(self, position: Node, destination: Node) -> List[Node]:
+    def getPath(self, position: Point, destination: Point) -> List[Point]:
         """
         Plan a path from current position to destination while avoiding obstacles
         :param position: current (x,y) position

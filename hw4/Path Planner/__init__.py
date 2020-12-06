@@ -1,8 +1,4 @@
-"""
-    created by Jordan Gassaway, 12/5/2020
-    __init__.py: 
-"""
 
+from collections import namedtuple
 
-class __init__.py:
-    pass
+Point = namedtuple('Point', 'x y')
