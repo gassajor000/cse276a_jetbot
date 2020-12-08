@@ -3,6 +3,8 @@
     VoronoiMap: Creates a map of paths around the configuration space based
     on a Voronoi representation of the space.
 """
+import collections
+import heapq
 import math
 from typing import List, Tuple, Dict, Union
 from scipy.spatial import Voronoi
@@ -11,10 +13,14 @@ from . import Point
 
 PI_2 = 2 * math.pi
 
+
+def dist(p1, p2):
+    return math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2)
+
 class VoronoiMap:
     vertices = []  # type: List[Point]
     ridge_vertices = []  # type: List[Tuple[Point, Point]]
-    graph = {}          # type: Dict[Point: List[Point]]
+    graph = {}          # type: Dict[Point: List[tuple[Point, float]]]
     FILL_DENSITY = 8
 
     def __init__(self, boundaries: List[Point], obstacles: List[List[Point]]):
@@ -96,8 +102,9 @@ class VoronoiMap:
         # Assemble all the edges into a graph
         self.graph = {p: [] for p in self.vertices}
         for edge in self.ridge_vertices:
-            self.graph[edge[0]].append(edge[1])
-            self.graph[edge[1]].append(edge[0])
+            d = dist(edge[0], edge[1])
+            self.graph[edge[0]].append((edge[1], d))
+            self.graph[edge[1]].append((edge[0], d))
 
     def add_obstacle(self, obstacle: List[Point]):
         """
@@ -110,9 +117,6 @@ class VoronoiMap:
 
     def _get_closest_vertex(self, p: Point):
         """get the closest vertex to a point"""
-        def dist(p1, p2):
-            return math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2)
-
         min_d = None
         closest = None
         for vertex in self.vertices:
@@ -123,7 +127,9 @@ class VoronoiMap:
 
         return closest
 
-    def find_path_to(self, start: Point, end: Point, visited_nodes: List[Point]=None) -> Union[List[Point], None]:
+    PathNode =  collections.namedtuple('PathNode', 'dist vertex prev_node')
+
+    def find_shortest_path_to(self, start: Point, end: Point) -> Union[List[Point], None]:
         """
         Find a path from start to end vertices
         :param visited_nodes: list of nodes already visited
@@ -131,24 +137,43 @@ class VoronoiMap:
         :param end: ending vertex
         :return: path from start to end, None if path does not exist.
         """
-        if end is start:
-            return [end]
+        node_mapping = { v: self.PathNode(float('infinity'), v, None) for v in self.vertices }   # type: Dict[Point, VoronoiMap.PathNode]
+        node_mapping[start] = self.PathNode(0.0, start, None)
+        dijkstra_q = list(node_mapping.values())     # list of nodes to process
+        heapq.heapify(dijkstra_q)
 
-        if visited_nodes is None:
-            visited_nodes = []
+        def process_node(n: VoronoiMap.PathNode):
+            for next_point, dist_to_next in self.graph[n.vertex]:
+                next_node = node_mapping[next_point]
+                if next_node not in dijkstra_q:     # already found shortest path to node
+                    continue
+                dist_through_n = n.dist + dist_to_next
+                if next_node.dist > dist_through_n:
+                    dijkstra_q.remove(next_node)        # Node needs to be removed and readded since we are changing the priority
+                    new_next = self.PathNode(dist_through_n, next_node.vertex, n)
+                    node_mapping[next_node.vertex] = new_next
+                    heapq.heappush(dijkstra_q, new_next)
 
-        for next_v in self.graph[start]:
-            if next_v in visited_nodes: # already been here
-                continue
-            visited_nodes_copy = visited_nodes.copy()
-            visited_nodes_copy.append(start)
-            path = self.find_path_to(next_v, end, visited_nodes_copy)
+        def build_path():
+            n = node_mapping[end]
+            path = []
+            while n.vertex is not start:
+                path.insert(0, n.vertex)
+                n = n.prev_node
 
-            if path:
-                path.insert(0, start)
-                return path
+            path.insert(0, n.vertex)    # add start node
+            return path
 
-        return None
+        while dijkstra_q:
+            node = heapq.heappop(dijkstra_q)
+            process_node(node)
+            if node.vertex is end:      # break out once we reach the end
+                break
+
+            if node.dist == float('infinity'):  # Node (an all remaining nodes) are unreachable from start. End was not reachable.
+                return None
+
+        return build_path()
 
     def plot(self):
         """plot using pyplot"""
