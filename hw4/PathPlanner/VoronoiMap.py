@@ -4,7 +4,7 @@
     on a Voronoi representation of the space.
 """
 import math
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 from scipy.spatial import Voronoi
 
 from . import Point
@@ -28,7 +28,7 @@ class VoronoiMap:
         for obstacle in obstacle_points:
             all_points += obstacle
 
-        self.graph = Voronoi(all_points, incremental=True)
+        self.voronoi = Voronoi(all_points, incremental=True)
         self._make_graph()
 
     def _fill_edge_with_points(self, p1, p2):
@@ -48,7 +48,7 @@ class VoronoiMap:
         return fill_points
 
     def _make_graph(self):
-        self.vertices = list(map(lambda v: Point(v[0], v[1]),self.graph.vertices))
+        self.vertices = list(map(lambda v: Point(v[0], v[1]), self.voronoi.vertices))
         self.ridge_vertices = []
         invalid_vertices = []      # vertices inside the obstacles
 
@@ -83,7 +83,7 @@ class VoronoiMap:
                     break
 
         # remove edges that connect to an invalid vertex
-        for edge in self.graph.ridge_vertices:
+        for edge in self.voronoi.ridge_vertices:
             # finite-valid vertices only
             if -1 not in edge and edge[0] not in invalid_vertices and edge[1] not in invalid_vertices:
                 self.ridge_vertices.append((self.vertices[edge[0]], self.vertices[edge[1]]))
@@ -105,7 +105,7 @@ class VoronoiMap:
         :param obstacle: list of points outlining an obstacle
         """
         obstacle_points = self._fill_polygon(obstacle)
-        self.graph.add_points(obstacle_points)
+        self.voronoi.add_points(obstacle_points)
         self._make_graph()
 
     def _get_closest_vertex(self, p: Point):
@@ -123,9 +123,10 @@ class VoronoiMap:
 
         return closest
 
-    def find_path_to(self, start: Point, end: Point, visited_nodes: List[Point]=None) -> List[Point]:
+    def find_path_to(self, start: Point, end: Point, visited_nodes: List[Point]=None) -> Union[List[Point], None]:
         """
         Find a path from start to end vertices
+        :param visited_nodes: list of nodes already visited
         :param start: starting vertex
         :param end: ending vertex
         :return: path from start to end, None if path does not exist.
@@ -149,7 +150,6 @@ class VoronoiMap:
 
         return None
 
-
     def plot(self):
         """plot using pyplot"""
         def _adjust_bounds(ax, points):
@@ -169,7 +169,7 @@ class VoronoiMap:
         for i, v in enumerate(self.vertices):
             vertices[i][0], vertices[i][1] = v.x, v.y
 
-        ax.plot(self.graph.points[:, 0], self.graph.points[:, 1], '.', markersize=None)
+        ax.plot(self.voronoi.points[:, 0], self.voronoi.points[:, 1], '.', markersize=None)
         ax.plot(vertices[:, 0], vertices[:, 1], 'o')
 
         line_colors = 'k'
@@ -184,4 +184,4 @@ class VoronoiMap:
                                          alpha=line_alpha,
                                          linestyle='solid'))
 
-        _adjust_bounds(ax, self.graph.points)
+        _adjust_bounds(ax, self.voronoi.points)
