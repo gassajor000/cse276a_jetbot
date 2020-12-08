@@ -115,7 +115,7 @@ class VoronoiMap:
         self.voronoi.add_points(obstacle_points)
         self._make_graph()
 
-    def _get_closest_vertex(self, p: Point):
+    def get_closest_vertex(self, p: Point):
         """get the closest vertex to a point"""
         min_d = None
         closest = None
@@ -210,3 +210,22 @@ class VoronoiMap:
                                          linestyle='solid'))
 
         _adjust_bounds(ax, self.voronoi.points)
+        return ax
+
+    def plotPath(self, path: List[Point]):
+        """plot a path over the map"""
+        from matplotlib.collections import LineCollection
+        ax = self.plot()
+
+        segments = []
+        for i in range(len(path)):
+            if i != len(path) - 1:
+                segments.append([(path[i].x, path[i].y), (path[i+1].x, path[i+1].y)])
+
+        ax.add_collection(LineCollection(segments,
+                                         colors='red',
+                                         lw=2.0,
+                                         alpha=1.0,
+                                         linestyle='solid'))
+
+        return ax

@@ -24,3 +24,13 @@ class PathPlanner:
         :param destination: destination point (x,y)
         :return: List of points comprising a path from position to destination
         """
+        start_v = self.map.get_closest_vertex(position)
+        end_v = self.map.get_closest_vertex(destination)
+
+        path = self.map.find_shortest_path_to(start_v, end_v)
+
+        if path:
+            path.insert(0, position)
+            path.append(destination)
+
+        return path
