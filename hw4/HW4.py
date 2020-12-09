@@ -6,47 +6,29 @@ import time
 
 from WallE import WallE
 
-def drive_to_waypoints(file_name):
+def drive_to_stops(file_name):
 
     # open way points file
-    waypoints = []
+    stops = []
     with open(file_name) as fl:
         for line in fl.readlines():
             if line != '' and line != ' ':
-                x, y, r = line.split(',')
-                waypoints.append((float(x), float(y)))
+                x, y = line.split(',')
+                stops.append((float(x), float(y)))
 
-    pos = (waypoints[0][0], waypoints[0][1], 0.00)
+    start = stops.pop()
+    pos = (start[0], start[1], 0.00)
     walle = WallE(init_pos=pos)
     try:
-        input("Please move WallE to ({:.2f}, {:.2f}, 0.00) and press enter".format(*waypoints[0]))
-        walle.drive_path(waypoints)
-        walle.locator.dump_x()
+        input("Please move WallE to ({:.2f}, {:.2f}, 0.00) and press enter".format(*stops[0]))
+        for stop in stops:
+            walle.navigate_to(stop)
+            walle.locator.dump_x()
+            time.sleep(2.0)
     finally:
         walle.close()
 
-def take_images():
-    def save_image(image):
-        import uuid
-        file_path = 'images/' + str(uuid.uuid1()) + '.jpg'
-        with open(file_path, 'wb') as f:
-            f.write(image)
-
-    from jetbot import Camera, bgr8_to_jpeg
-    camera = Camera.instance(width=300, height=300)
-
-    import subprocess
-    subprocess.call(['mkdir', '-p', 'images'])
-    for _ in range(5):
-        input('Move robot to a new position. Press any key to continue.')
-        save_image(bgr8_to_jpeg(camera.value))
-
-    camera.stop()
-
 
 if __name__ == '__main__':
-    # take_images()
-
-#     drive_to_waypoints('circle_path.txt')
-    drive_to_waypoints('figure_eight_path.txt')
+    drive_to_stops('stops.txt')
 

@@ -10,7 +10,7 @@ import time
 import math
 
 import jetbot
-from PositionModel import PositionModel
+from .PositionModel import PositionModel
 from hw4.PositionDetector import PositionDetector
 
 from threading import Thread, Event
@@ -120,9 +120,19 @@ class WallE:
         for point in waypoints:
             self._drive_to_x_y(*point)
             self.drive.stop()
-            time.sleep(1)
+            time.sleep(0.1)
 
         self.drive.stop()
+
+    def navigate_to(self, x, y):
+        """
+        Compute and drive a path to x, y location.
+        :param x: x coordinate
+        :param y: y coordinate
+        """
+        start, end = Point(self.position.x, self.position.y), Point(x, y)
+        path = self.planner.getPath(start, end)
+        self.drive_path(path)
 
     def updatePosition(self):
         speed_r, speed_l = self.drive.get_current_speed()
