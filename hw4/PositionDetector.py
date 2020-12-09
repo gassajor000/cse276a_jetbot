@@ -3,11 +3,11 @@
     PositionDetector: Uses the camera to detect the current position
 """
 from filterpy.kalman import KalmanFilter
-from filterpy.common import Q_discrete_white_noise
 import numpy
 
 from Camera import Camera
-from QRDetector import QRDetector
+
+from hw4.LandmarkDetector import LandmarkDetector
 
 
 class PositionDetector:
@@ -18,7 +18,7 @@ class PositionDetector:
     ESTIMATION_PROXIMITY = 0.25  # Bias position readings to within 25cm of predicted position
     NUM_KINEMATIC_VARS = 3
 
-    def __init__(self, init_pos=(0.0, 0.0, 0.0), model=None, camera_instance=None):
+    def __init__(self, landmark_detector: LandmarkDetector, init_pos=(0.0, 0.0, 0.0), model=None, camera_instance=None):
         """
         Initialize camera, object detection and Kalman Fiilter
 
@@ -70,7 +70,7 @@ class PositionDetector:
                     0 0                        0 (sd sin(theta) sp)^2
         """
         self.logging = False
-        self.detector = QRDetector()
+        self.detector = landmark_detector
         self.camera = Camera(camera_instance)
 
         self.num_landmarks = self.detector.get_num_landmarks()

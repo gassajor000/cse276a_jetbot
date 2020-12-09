@@ -2,23 +2,13 @@
     created by Jordan Gassaway, 11/29/2020
     QRDetector: 
 """
-from LandmarkDetector import LandmarkDetector
+from .LandmarkDetector import LandmarkDetector
 
 from pyzbar.pyzbar import decode
 from pyzbar.wrapper import ZBarSymbol
 
 
 class QRDetector(LandmarkDetector):
-    LANDMARKS = {b'code 0': LandmarkDetector.Landmark((1.3,0.0), 16.0, 'landmark 0 (code0)', 'bottle', b'code 0'),
-                 b'code 1': LandmarkDetector.Landmark((0.0,0.55), 16.0, 'landmark 1 (code1)', 'apple', b'code 1'),
-                 b'code 2': LandmarkDetector.Landmark((1.02,2.39), 16.0, 'landmark 2 (code2)', 'tie', b'code 2'),
-                 b'code 3': LandmarkDetector.Landmark((0.7,1.2), 16.0, 'landmark 3 (code3)', 'bowl', b'code 3'),
-                 b'code 4': LandmarkDetector.Landmark((1.3,1.05), 16.0, 'landmark 4 (code4)', 'stop sign', b'code 4'),
-                 b'code 5': LandmarkDetector.Landmark((.028,-0.7), 16.0, 'landmark 5 (code5)', 'clock', b'code 5')}
-
-    def __init__(self):
-        pass
-
     def calibrate(self, get_image_func):
         print('Beginning QR Detector Calibration')
         import time

@@ -2,15 +2,23 @@
     created by Jordan Gassaway, 10/27/2020
     WallE:
 """
+import json
+from typing import List
+
 import numpy
 import time
 import math
 
 import jetbot
 from PositionModel import PositionModel
-from PositionDetector import PositionDetector
+from hw4.PositionDetector import PositionDetector
 
 from threading import Thread, Event
+
+from hw4.LandmarkDetector import Landmark
+from hw4.PathPlanner import Point
+from hw4.PathPlanner.PathPlanner import PathPlanner
+from hw4.QRDetector import QRDetector
 
 
 class WallE:
@@ -19,16 +27,32 @@ class WallE:
     UPDATE_DT = 0.2        # 20 ms
     EVAL_POSITION = 0.05    # 50 ms
 
-    def __init__(self, init_pos=(0.0, 0.0, 0.0)):
+    def __init__(self, map_file, init_pos=(0.0, 0.0, 0.0)):
         self.drive = self.DriveModel()
         self.drive.stop()   # Kill any previous drive commands
         self.position = PositionModel()
         self.movement = self.MovementModel()
 
-        self.locator = PositionDetector(init_pos=init_pos)
+        boundaries, obstacles, landmarks = self._read_map(map_file)
+        self.planner = PathPlanner(boundaries, obstacles)
+
+        self.locator = PositionDetector(QRDetector(landmarks), init_pos=init_pos)
         self.updateTimer = self.UpdateThread(self.UPDATE_DT, self.updatePosition)     # update position every 20 ms
         self.updateTimer.start()
 
+    @staticmethod
+    def _read_map(map_file) -> (List[Point], List[List[Point]], List[Landmark]):
+        with open(map_file) as f:
+            map_data = json.load(f)
+            boundaries = list(map(lambda p: Point(p[0], p[1]) , map_data['bounds']))
+            obstacles = [list(map(lambda p: Point(p[0], p[1]) , obstacle)) for obstacle in map_data['obstacles']]
+            landmarks = []
+            for landmark in map_data['landmarks']:
+                x, y = landmark['position'][0], landmark['position'][1]
+                label = bytes(landmark['data'], 'utf-8') if landmark['category'] == 'QR code' else landmark['label']
+                landmarks.append(Landmark((x, y), landmark['height'], landmark['name'], landmark['category'], label))
+
+            return boundaries, obstacles, landmarks
 
     def drive_to(self, x, y, theta):
         """

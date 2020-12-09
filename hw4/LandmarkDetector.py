@@ -8,14 +8,18 @@ import numpy
 from jetbot import ObjectDetector
 
 
+class Landmark():
+    def __init__(self, position, height, name, category, label):
+        self.label = label
+        self.name = name
+        self.category = category
+        self.height = height  # cm
+        self.position = position
+
+
 class LandmarkDetector():
-    class Landmark():
-        def __init__(self, position, height, name, category, label):
-            self.label = label
-            self.name = name
-            self.category = category
-            self.height = height    # cm
-            self.position = position
+    def __init__(self, landmarks):
+        self.LANDMARKS = landmarks
 
     class Detection():
         def __init__(self, bounding_box, label):
@@ -23,7 +27,7 @@ class LandmarkDetector():
             self.label = label
 
     # Landmark positions & classes
-    LANDMARKS = {}
+    LANDMARKS = {}  # type: Dict[bytes, Landmark]
 
     CAMERA_OFFSET = 2.0  # cm between the camera and the position model point
     FOCAL_LENGTH = .178     # 1.78 mm
