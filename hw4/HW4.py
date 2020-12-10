@@ -16,13 +16,14 @@ def drive_to_stops(file_name):
                 x, y = line.split(',')
                 stops.append((float(x), float(y)))
 
-    start = stops.pop()
+    start = stops.pop(0)
     pos = (start[0], start[1], 0.00)
-    walle = WallE(init_pos=pos)
+    walle = WallE('map.json', init_pos=pos)
+    # walle.planner.map.plotPath(walle.planner.getPath(Point(stops[0][0], stops[0][1]), Point(stops[1][0], stops[1][1])))
     try:
         input("Please move WallE to ({:.2f}, {:.2f}, 0.00) and press enter".format(*stops[0]))
         for stop in stops:
-            walle.navigate_to(stop)
+            walle.navigate_to(stop[0], stop[1])
             walle.locator.dump_x()
             time.sleep(2.0)
     finally:

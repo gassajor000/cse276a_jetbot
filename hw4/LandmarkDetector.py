@@ -3,10 +3,6 @@
     LandmarkDetector: Detects landmarks in an image
 """
 import math
-import numpy
-
-from jetbot import ObjectDetector
-
 
 class Landmark():
     def __init__(self, position, height, name, category, label):
