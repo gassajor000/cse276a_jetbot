@@ -76,18 +76,29 @@ class PositionDetector:
         self.num_landmarks = self.detector.get_num_landmarks()
         # keep an ordered list of the landmarks to keep track of their order in the x matrix
         self.landmarks_ids = self.detector.get_landmark_labels()
-        self.found_landmarks = []
         self.num_vars = self.NUM_KINEMATIC_VARS + 2* self.num_landmarks   # (x, y, theta, v, omega, (x,y) for each landmark)
 
         # setup kalman filter
         self.filter = KalmanFilter(dim_x=self.num_vars, dim_z=self.num_landmarks*2)
         init_x = numpy.zeros(self.num_vars, dtype=float)
         init_x[0], init_x[1], init_x[2] = init_pos[0], init_pos[1], init_pos[2]
+
+        landmark_positions = self.detector.get_landmark_positions()
+        for i in range(self.num_landmarks):
+            pos = landmark_positions[self.landmarks_ids[i]]
+            k = 2 * i
+            # landmark position
+            init_x[k + self.NUM_KINEMATIC_VARS] = pos[0]
+            init_x[k + self.NUM_KINEMATIC_VARS + 1] = pos[1]
+
         print('init x {} init pos {}'.format(init_x, init_pos))
         self.filter.x = init_x
 
-        ident = numpy.eye(self.num_vars)
-        self.filter.P = ident * .25
+        p = numpy.zeros(self.num_vars)
+        p[0][0] = 1
+        p[1][1] = 1
+        p[2][2] = 1
+        self.filter.P = p * .25
 
     def calibrate(self, file_path='images/'):
         """Calibrate capture images, calibrate camera, calibrate detector"""
@@ -112,7 +123,7 @@ class PositionDetector:
     def _get_Q_matrix(self, dt):
         Q = numpy.zeros((self.num_vars, self.num_vars), dtype=float)
         # x' = x  -v sin(theta) dt
-        Q[0][0] =  (-numpy.sin(self.filter.x[2]) * dt * self.V_NOISE) **2
+        Q[0][0] = (-numpy.sin(self.filter.x[2]) * dt * self.V_NOISE) **2
         # y' = y + v cos(theta) dt
         Q[1][0] = (numpy.cos(self.filter.x[2]) * dt * self.V_NOISE) **2
         # theta' = theta + omega dt
@@ -121,7 +132,7 @@ class PositionDetector:
         return Q
 
     def _get_R_matrix(self):
-        R = numpy.zeros((self.num_landmarks, self.num_landmarks), dtype=float)
+        R = numpy.zeros((2*self.num_landmarks, 2*self.num_landmarks), dtype=float)
         for i in range(self.num_landmarks):
             k = 2*i
             # landmark position
@@ -131,7 +142,7 @@ class PositionDetector:
         return R
 
     def _get_H_matrix(self, measurements):
-        num_lm_coords =  2* self.num_landmarks
+        num_lm_coords = 2 * self.num_landmarks
         H = numpy.zeros((num_lm_coords, num_lm_coords + self.NUM_KINEMATIC_VARS), dtype=float)
         for i in range(self.num_landmarks):
             if measurements[i] is not None:     # do not include landmarks that were not detected
@@ -184,19 +195,13 @@ class PositionDetector:
                 phi = self.detector.get_angle_offset_to_landmark(det)
                 measurements.append((d, phi))
 
-                if lmk_id not in self.found_landmarks:  # set an initial position first
-                    x, y = self.get_x_y_from_d_phi(d, phi)
-                    k = i*2
-                    self.filter.x[self.NUM_KINEMATIC_VARS+k] = x + self.filter.x[0]
-                    self.filter.x[self.NUM_KINEMATIC_VARS+k+1] = y + self.filter.x[1]
-                    self.found_landmarks.append(lmk_id)
             else:
                 measurements.append(None)   # Landmark was not detected
 
         if self.logging:
             print("Relative Positions {}".format(measurements))
 
-        self.filter.update(z=self.get_z_vector(measurements), H=self._get_H_matrix(measurements))
+        self.filter.update(z=self.get_z_vector(measurements), H=self._get_H_matrix(measurements), R=self._get_R_matrix())
         if self.logging:
             print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 

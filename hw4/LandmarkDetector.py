@@ -101,3 +101,7 @@ class LandmarkDetector():
     def get_landmark_labels(self):
         """Returns a list of all the landmark labels"""
         return list(self.LANDMARKS.keys())
+
+    def get_landmark_positions(self):
+        """Returns a mapping of each of the landmark positions"""
+        return {id: l.position for id, l in self.LANDMARKS.items()}
