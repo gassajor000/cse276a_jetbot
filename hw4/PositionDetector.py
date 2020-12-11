@@ -7,7 +7,7 @@ import numpy
 
 from Camera import Camera
 
-from hw4.LandmarkDetector import LandmarkDetector
+from LandmarkDetector import LandmarkDetector
 
 
 class PositionDetector:
@@ -94,7 +94,7 @@ class PositionDetector:
         print('init x {} init pos {}'.format(init_x, init_pos))
         self.filter.x = init_x
 
-        p = numpy.zeros(self.num_vars)
+        p = numpy.zeros((self.num_vars, self.num_vars))
         p[0][0] = 1
         p[1][1] = 1
         p[2][2] = 1
@@ -164,7 +164,7 @@ class PositionDetector:
         elif theta < 0:
             self.filter.x[2] += pi_2
 
-    def get_position(self, velocity, omega, dt):
+    def get_position(self, velocity, omega, dt, read_sensors=True):
         """
         Get the estimated position of the robot
         :param velocity: forward velocity of the robot (rel to robot, m/s)
@@ -179,31 +179,32 @@ class PositionDetector:
             print("Predicted Position ({:.3f}, {:.3f}, {:.3f}) [{:.3f}, {:.3f}]".format(self.filter.x[0], self.filter.x[1],
                                                                                         self.filter.x[2], velocity, omega))
 
-        image = self.camera.get_image()
-        landmark_detections = self.detector.detect_landmarks(image)
+        if read_sensors:
+            image = self.camera.get_image()
+            landmark_detections = self.detector.detect_landmarks(image)
 
-        if not landmark_detections:
-            return self.filter.x    # Couldn't find any landmarks. Just use the prediction.
+            if not landmark_detections:
+                return self.filter.x    # Couldn't find any landmarks. Just use the prediction.
 
-        measurements = []
-        for i in range(self.num_landmarks):
-            lmk_id = self.landmarks_ids[i]
-            if lmk_id in landmark_detections:
-                print('Detected {}'.format(lmk_id))
-                lmk, det = landmark_detections[lmk_id]
-                d = self.detector.get_distance_to_landmark(lmk, det)
-                phi = self.detector.get_angle_offset_to_landmark(det)
-                measurements.append((d, phi))
+            measurements = []
+            for i in range(self.num_landmarks):
+                lmk_id = self.landmarks_ids[i]
+                if lmk_id in landmark_detections:
+                    print('Detected {}'.format(lmk_id))
+                    lmk, det = landmark_detections[lmk_id]
+                    d = self.detector.get_distance_to_landmark(lmk, det)
+                    phi = self.detector.get_angle_offset_to_landmark(det)
+                    measurements.append((d, phi))
 
-            else:
-                measurements.append(None)   # Landmark was not detected
+                else:
+                    measurements.append(None)   # Landmark was not detected
 
-        if self.logging:
-            print("Relative Positions {}".format(measurements))
+            if self.logging:
+                print("Relative Positions {}".format(measurements))
 
-        self.filter.update(z=self.get_z_vector(measurements), H=self._get_H_matrix(measurements), R=self._get_R_matrix())
-        if self.logging:
-            print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
+            self.filter.update(z=self.get_z_vector(measurements), H=self._get_H_matrix(measurements), R=self._get_R_matrix())
+            if self.logging:
+                print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         return self.filter.x
 

@@ -37,7 +37,9 @@ class WallE:
         self.planner = PathPlanner(boundaries, obstacles)
 
         self.locator = PositionDetector(QRDetector(landmarks), init_pos=init_pos)
-        self.updateTimer = self.UpdateThread(self.UPDATE_DT, self.updatePosition)     # update position every 20 ms
+        self.updateTimer = self.UpdateThread(self.EVAL_POSITION, self.updatePosition)     # update position every 20 ms
+        self.time_since_sensor_read = 0.0
+        self.last_update = time.time()
         self.updateTimer.start()
 
     @staticmethod
@@ -93,16 +95,15 @@ class WallE:
         """
         print("Drive to {:.2f} {:.2f}".format(x, y))
         self.locator.logging = True
-        while not self._is_at_position(x, y):
-            # get relative angle to
-            d_theta = self.position.get_rel_angle_to(self.position.get_abs_angle_to(x, y))
 
+        while not self._is_at_position(x, y):
+            desired_theta = self.position.get_abs_angle_to(x, y)
+            d_theta = self.position.get_rel_angle_to(desired_theta, allow_clockwise=True)
             # if off by less than 10 deg, drive forward
-            if abs(d_theta) < math.radians(self.ERROR_THETA):
+            if abs(d_theta) < self.ERROR_THETA:
                 self.drive.forward()
             else:    # if to the left, compute left arc
-                self.speed_r, self.speed_l, _ = self.movement.arc_to(x, y, self.position)
-                self.drive.at_speed(self.speed_r, self.speed_l)
+                self._turn_to_theta(desired_theta)
 
             time.sleep(self.EVAL_POSITION)  # reevaluate every .2 sec
 
@@ -133,11 +134,19 @@ class WallE:
         self.drive_path(path)
 
     def updatePosition(self):
+        dt = time.time() - self.last_update
+        self.last_update = time.time()
+        self.time_since_sensor_read += dt
+        read_sensors = self.time_since_sensor_read > self.UPDATE_DT
+
         speed_r, speed_l = self.drive.get_current_speed()
         v, omega = self.movement.get_current_v_omega(speed_r, speed_l)
 #         print("speed_r: {:.4f} speed_l: {:.4f}".format(speed_r, speed_l))
-        new_pos = self.locator.get_position(v / 100.0, omega, self.UPDATE_DT)
+        new_pos = self.locator.get_position(v / 100.0, omega, dt, read_sensors)
         self.position.set_position(new_pos[0], new_pos[1], new_pos[2])
+
+        if read_sensors:
+            self.time_since_sensor_read = 0.0
 
     def close(self):
         self.locator.close()
@@ -158,14 +167,16 @@ class WallE:
     def _turn_to_theta(self, theta):
         """turn to absolute orientation theta"""
         print("Turn to {:.2f}".format(theta))
-        delta = self.position.get_rel_angle_to(theta)
-        if delta > 0:
-            self.drive.left()
-        else:
-            self.drive.right()
-        while delta > self.ERROR_THETA:
+        delta = self.position.get_rel_angle_to(theta, allow_clockwise=True)
+
+        while abs(delta) > self.ERROR_THETA:
+            if delta > 0:
+                self.drive.left()
+            else:
+                self.drive.right()
+            print("delta {:.4f}".format(delta))
             time.sleep(self.EVAL_POSITION)
-            delta = self.position.get_rel_angle_to(theta)
+            delta = self.position.get_rel_angle_to(theta, allow_clockwise=True)
 
         self.drive.stop()
 
@@ -187,7 +198,7 @@ class WallE:
                 t_exec = tf - ts
                 if t_exec < self.interval:
                     time.sleep(self.interval - t_exec)
-                else:
+                elif t_exec > WallE.UPDATE_DT:
                     print("Timer over run! Exec Time: {:.5f}".format(t_exec))
 
     class DriveModel():
@@ -259,12 +270,12 @@ class WallE:
             self._set_speed(self.BASE_SPEED, self.BASE_SPEED)
 
         def right(self):
-#             print("--drive: right")
-            self._set_speed(self.BASE_SPEED, -self.BASE_SPEED)
+            print("--drive: right")
+            self._set_speed(-self.BASE_SPEED, self.BASE_SPEED)
 
         def left(self):
-#             print("--drive: left")
-            self._set_speed(-self.BASE_SPEED, self.BASE_SPEED)
+            print("--drive: left")
+            self._set_speed(self.BASE_SPEED, -self.BASE_SPEED)
 
         def stop(self):
 #             print("--drive: stop")
@@ -346,6 +357,7 @@ class WallE:
             if vr == vl:    # if speeds are the same, we are going straight (not turning)
                 return vr, 0.0
             elif vr == -vl: # special case, rotating in place. r = w/2, v = vr
+                print(vr, vl)
                 return 0.0, vr / (self.WHEEL_SEPARATION / 2) * 0.7     # Seems to rotate slower than predicted wheel velocities
 
             vo, vi = (vr, vl) if vr > vl else (vl, vr)
