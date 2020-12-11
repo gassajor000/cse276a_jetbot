@@ -10,20 +10,20 @@ import time
 import math
 
 import jetbot
-from .PositionModel import PositionModel
-from hw4.PositionDetector import PositionDetector
+from PositionModel import PositionModel
+from PositionDetector import PositionDetector
 
 from threading import Thread, Event
 
-from hw4.LandmarkDetector import Landmark
-from hw4.PathPlanner import Point
-from hw4.PathPlanner.PathPlanner import PathPlanner
-from hw4.QRDetector import QRDetector
+from LandmarkDetector import Landmark
+from PathPlanner import Point
+from PathPlanner.PathPlanner import PathPlanner
+from QRDetector import QRDetector
 
 
 class WallE:
     ERROR_THETA = math.radians(10)  # 10 deg
-    ERROR_DISTANCE = 0.05    # 10 cm
+    ERROR_DISTANCE = 0.05    # 05 cm
     UPDATE_DT = 0.2        # 20 ms
     EVAL_POSITION = 0.05    # 50 ms
 
@@ -119,8 +119,6 @@ class WallE:
 
         for point in waypoints:
             self._drive_to_x_y(*point)
-            self.drive.stop()
-            time.sleep(0.1)
 
         self.drive.stop()
 
@@ -196,7 +194,7 @@ class WallE:
         """Abstraction for driving the robot. Converts velocities to power settings."""
         BASE_POWER = 0.35
         R_L_OFFSET = 0.012
-        SPEED_PWR_RATIO = 0.022
+        SPEED_PWR_RATIO = 0.019
         BASE_SPEED = BASE_POWER / SPEED_PWR_RATIO
 
         def __init__(self):
@@ -281,7 +279,7 @@ class WallE:
         """Model path planning and movement"""
         # WHEEL_CIRCUMFERENCE = 0.215  # cm
         WHEEL_SEPARATION = 13.1 # W (cm)
-        MIN_SPEED = 20.0    # minimum wheel speed in cm/s
+        MIN_SPEED = 12.0    # minimum wheel speed in cm/s
         MAX_SPEED = 24.0    # maximum wheel speed in cm/s
         RAD_90 = math.pi / 2
 
@@ -305,16 +303,23 @@ class WallE:
             turn_theta = position.get_rel_angle_to(position.get_abs_angle_to(x, y), allow_clockwise=True)
             left_turn = turn_theta > 0
 
-            if abs(turn_theta) > self.RAD_90: # just turn sharply instead of computing an arc.
-                v_outer, v_inner = self.MAX_SPEED, self.MIN_SPEED
-                # print('turn ' + 'left' if left_turn else 'right')
-                return (v_outer, v_inner, math.pi) if left_turn else (v_inner, v_outer, -math.pi)
-
             sec_theta = self.RAD_90 - abs(turn_theta)
             arc_theta = math.pi - 2* sec_theta
             radius = sec_len / (2* math.cos(sec_theta))
-
             w = self.WHEEL_SEPARATION
+
+            if radius < w/2: # just turn sharply instead of computing an arc.
+                v_outer, v_inner = self.MIN_SPEED, 0.5
+#                 print('r {:.3f}, turn_theta {:.3f}'.format(radius, turn_theta))
+#                 print('turn ' + ('left' if left_turn else 'right'))
+                return (v_outer, v_inner, math.pi) if left_turn else (v_inner, v_outer, -math.pi)
+
+            if abs(turn_theta) > self.RAD_90: # just turn sharply instead of computing an arc.
+                v_outer, v_inner = self.MAX_SPEED, (self.MIN_SPEED - 2)
+#                 print('r {:.3f}, turn_theta {:.3f}'.format(radius, turn_theta))
+#                 print('turn ' + ('left' if left_turn else 'right'))
+                return (v_outer, v_inner, math.pi) if left_turn else (v_inner, v_outer, -math.pi)
+
             d_outer = (radius + w/2) * arc_theta
             d_inner = (radius - w/2) * arc_theta
             dt = (d_inner / self.MIN_SPEED)  # time to travers the arc
