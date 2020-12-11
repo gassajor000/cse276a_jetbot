@@ -207,11 +207,12 @@ class WallE:
         R_L_OFFSET = 0.012
         SPEED_PWR_RATIO = 0.019
         BASE_SPEED = BASE_POWER / SPEED_PWR_RATIO
+        ALPHA_INCREMENTS = {0.66: 2.503, 0.925: 0.874, 1.04: 0.346, 1.419: 1.246, 1.99: 0.456 }
+        ACCEL_INCREMENTS = {0.66: 2.503, 0.925: 0.874, 1.04: 0.346, 1.419: 1.246, 1.99: 0.456 }
 
         def __init__(self):
             self.robot = jetbot.robot.Robot()
-            self.speed_l = 0.0
-            self.speed_r = 0.0
+            self.state = 'stop'
 
         def calibrate(self):
             # calibrate left and right speeds
@@ -230,29 +231,56 @@ class WallE:
             print("Alignment calibration complete: right/left offset: {}".format(self.R_L_OFFSET))
             input('Press any key to continue')
 
-            print("Power calibration")
-            lmb = []   # lambda (speed to power ratio)
-            for pwr in [0.4, 0.44, 0.48, 0.52, 0.56, 0.58, 0.62]:
-                # drive full speed for 1s
-                self._set_motors(pwr, pwr)
-                time.sleep(1)
-                self.robot.stop()
-                # enter distance traveled
-                ratio = pwr / float(input("Enter cm traveled: "))
-                lmb.append(ratio)
-                print("\t pwr to distance ratio: {}".format(ratio))
+            time_increments = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+            dt = 0.25
 
-            self.SPEED_PWR_RATIO = numpy.mean(lmb, axis=0)
-            self.BASE_SPEED = self.BASE_POWER / self.SPEED_PWR_RATIO
-            print("Power calibration complete: pwr conversion factor: {}".format(self.SPEED_PWR_RATIO))
+            print("Alpha calibration")
+            alpha_steps = {}
+            omega_last = 0.0
+            theta_last = 0.0
+            for d_time in time_increments:
+                self.left()
+                time.sleep(d_time)
+                self.stop()
+
+                theta = math.radians(float(input("Input degrees rotated counter clockwise")))
+                omega = (theta -  theta_last) / dt
+                alpha = (omega - omega_last) / dt
+                alpha_steps[omega_last] = alpha
+                print("alpha {:.3f} omega {:.3f} theta {:.3f}".format(alpha, omega, theta))
+
+                theta_last = theta
+                omega_last = omega
+
+            print("Alpha steps: {}".format(alpha_steps))
+            self.ALPHA_INCREMENTS = alpha_steps
+
+            print("Acceleration calibration")
+            accel_steps = {}
+            v_last = 0.0
+            d_last = 0.0
+            for d_time in time_increments:
+                self.forward()
+                time.sleep(d_time)
+                self.stop()
+
+                d = float(input("Input cm traveled"))
+                v = (d -  d_last) / dt
+                a = (v - v_last) / dt
+                accel_steps[v_last] = a
+                print("a {:.3f} v {:.3f} d {:.3f}".format(a, v, d))
+
+                v_last = v
+                d_last = d
+
+            print("Acceleration steps: {}".format(accel_steps))
+            self.ACCEL_INCREMENTS = accel_steps
 
         def _set_motors(self, pwr_r, pwr_l):
             self.robot.set_motors(pwr_l, pwr_r + self.R_L_OFFSET)
 
         def _set_speed(self, speed_r, speed_l):
-#             print("set speed r {} l {}".format(speed_r, speed_l))
-            self.speed_l = speed_l
-            self.speed_r = speed_r
+            # print("set speed r {} l {}".format(speed_r, speed_l))
             r_offset = self.R_L_OFFSET if speed_l >= 0 else -self.R_L_OFFSET
             self._set_motors(speed_r * self.SPEED_PWR_RATIO + r_offset, speed_l * self.SPEED_PWR_RATIO)
 
@@ -263,28 +291,61 @@ class WallE:
             :param speed_l: Left Wheel speed (cm/s)
             """
             # print("--drive: at speed {} {}".format(speed_r, speed_l))
-            self._set_speed(speed_r, speed_l)
+            # self._set_speed(speed_r, speed_l)
+            raise RuntimeError('at_speed is no longer supported!')
 
         def forward(self):
-#             print("--drive: forward")
+            # print("--drive: forward")
             self._set_speed(self.BASE_SPEED, self.BASE_SPEED)
+            self.state = 'forward'
 
         def right(self):
-            print("--drive: right")
+            # print("--drive: right")
             self._set_speed(-self.BASE_SPEED, self.BASE_SPEED)
+            self.state = 'right'
 
         def left(self):
-            print("--drive: left")
+            # print("--drive: left")
             self._set_speed(self.BASE_SPEED, -self.BASE_SPEED)
+            self.state = 'left'
 
         def stop(self):
-#             print("--drive: stop")
-            self.speed_l = 0.0
-            self.speed_r = 0.0
+            # print("--drive: stop")
             self.robot.stop()
+            self.state = 'stop'
 
-        def get_current_speed(self):
-            return self.speed_r, self.speed_l
+        def get_acceleration(self, velocity):
+            abs_omega = abs(omega)
+            sign = 1 if omega > 0.0 else -1
+            abs_alpha = 0.0
+
+            # determined experimentally
+            if abs_omega < 0.66:
+                abs_alpha = 2.503
+            elif abs_omega < 0.925:
+                abs_alpha = 0.874
+            elif abs_omega < 1.04:
+                abs_alpha = 0.346
+            elif abs_omega < 1.419:
+                abs_alpha = 1.246
+            elif abs_omega < 1.99:
+                abs_alpha = 0.456
+            else:  # omega saturates at 1.99 rad/s
+                abs_alpha = 0.0
+
+            return abs_alpha * sign
+
+        def get_alpha(self, omega):
+            abs_omega = abs(omega)
+            sign = 1 if omega > 0.0 else -1
+
+            # determined experimentally
+            for omega_step in self.ALPHA_INCREMENTS:
+                if abs_omega < omega_step:
+                    return self.ALPHA_INCREMENTS[omega_step] * sign
+
+            else:
+                return 0.0
 
     class MovementModel():
         """Model path planning and movement"""
