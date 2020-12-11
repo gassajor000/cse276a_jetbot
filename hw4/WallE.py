@@ -23,7 +23,7 @@ from hw4.QRDetector import QRDetector
 
 class WallE:
     ERROR_THETA = math.radians(10)  # 10 deg
-    ERROR_DISTANCE = 0.1    # 10 cm
+    ERROR_DISTANCE = 0.05    # 10 cm
     UPDATE_DT = 0.2        # 20 ms
     EVAL_POSITION = 0.05    # 50 ms
 

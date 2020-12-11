@@ -15,7 +15,7 @@ class Landmark():
 
 class LandmarkDetector():
     def __init__(self, landmarks):
-        self.LANDMARKS = landmarks
+        self.LANDMARKS = {lmk.label: lmk for lmk in landmarks}
 
     class Detection():
         def __init__(self, bounding_box, label):
