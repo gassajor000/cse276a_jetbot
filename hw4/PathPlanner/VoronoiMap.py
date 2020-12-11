@@ -41,7 +41,7 @@ class VoronoiMap:
         dx = (p2[0] - p1[0]) / self.FILL_DENSITY
         dy = (p2[1] - p1[1]) / self.FILL_DENSITY
         new_points = [p1, p2]
-        for j in range(8):
+        for j in range(self.FILL_DENSITY):
             new_points.append((p1[0] + dx * j, p1[1] + dy * j))
         return new_points
 
