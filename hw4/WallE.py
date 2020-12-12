@@ -82,7 +82,7 @@ class WallE:
 
             # drive forward to x, y
             self._drive_to_x_y(x, y)
-            self.drive.stop()
+            self._stop()
 
         # rotate to theta
         self._turn_to_theta(theta)
@@ -95,14 +95,20 @@ class WallE:
         """
         print("Drive to {:.2f} {:.2f}".format(x, y))
         self.locator.logging = True
+        fwd = False
 
         while not self._is_at_position(x, y):
             desired_theta = self.position.get_abs_angle_to(x, y)
             d_theta = self.position.get_rel_angle_to(desired_theta, allow_clockwise=True)
             # if off by less than 10 deg, drive forward
             if abs(d_theta) < self.ERROR_THETA:
+                if not fwd:
+                    print("Go")
+                    fwd = True
                 self.drive.forward()
             else:    # if to the left, compute left arc
+                fwd = False
+                self._stop()
                 self._turn_to_theta(desired_theta)
 
             time.sleep(self.EVAL_POSITION)  # reevaluate every .2 sec
@@ -121,7 +127,7 @@ class WallE:
         for point in waypoints:
             self._drive_to_x_y(*point)
 
-        self.drive.stop()
+        self._stop()
 
     def navigate_to(self, x, y):
         """
@@ -142,7 +148,7 @@ class WallE:
 #         print("speed_r: {:.4f} speed_l: {:.4f}".format(speed_r, speed_l))
         velocity, omega = self.locator.get_v_omega()
         accel, alpha = self.drive.get_acceleration(velocity), self.drive.get_alpha(omega)
-        new_pos = self.locator.get_position(accel, omega, dt, read_sensors)
+        new_pos = self.locator.get_position(accel, alpha, dt, read_sensors)
         self.position.set_position(new_pos[0], new_pos[1], new_pos[2])
 
         if read_sensors:
@@ -168,17 +174,36 @@ class WallE:
         """turn to absolute orientation theta"""
         print("Turn to {:.2f}".format(theta))
         delta = self.position.get_rel_angle_to(theta, allow_clockwise=True)
+        omega = 0.0
+        theta_drift = 0.0
 
         while abs(delta) > self.ERROR_THETA:
             if delta > 0:
                 self.drive.left()
             else:
                 self.drive.right()
-            print("delta {:.4f}".format(delta))
+            # print("delta {:.4f}".format(delta))
             time.sleep(self.EVAL_POSITION)
-            delta = self.position.get_rel_angle_to(theta, allow_clockwise=True)
+            _, omega = self.locator.get_v_omega()
+            theta_drift = self.drive.get_theta_drift(omega, self.EVAL_POSITION)
+            delta_1 = self.position.get_rel_angle_to(theta, allow_clockwise=True)
+            delta =  delta_1 - theta_drift
+            print("delta {} drift {} total {}".format(delta_1, theta_drift, delta))
 
+        # print("predicted theta drift = {:.3f}".format(theta_drift))
+        # theta1 = self.position.theta
+        self._stop()
+        # theta2 = self.position.theta
+        # print("actual theta drift = {:.3f}".format(theta2 - theta1))
+
+    def _stop(self):
+        """bring robot to stop"""
+        print('Stop')
         self.drive.stop()
+        v, w = self.locator.get_v_omega()
+        while v > 0.02 or abs(w) > 0.1:
+            time.sleep(self.EVAL_POSITION)
+            v, w = self.locator.get_v_omega()
 
     class UpdateThread(Thread):
         def __init__(self, interval, update_func):
@@ -207,10 +232,11 @@ class WallE:
         R_L_OFFSET = 0.012
         SPEED_PWR_RATIO = 0.019
         BASE_SPEED = BASE_POWER / SPEED_PWR_RATIO
-        ALPHA_INCREMENTS = { 1.396: 5.585, 1.99: 0.792 }
+        ALPHA_INCREMENTS = { 1.396: 3.0, 1.99: 0.792 }
         ACCEL_INCREMENTS = {0.16: 0.32, 0.22: 0.08 }
         DECEL = -0.32
         WINDDOWN = 5.585
+        WIND_DOWN_THETA_DRIFT = 0.225   # amount of theta drift during wind down
 
         def __init__(self):
             self.robot = jetbot.robot.Robot()
@@ -316,6 +342,15 @@ class WallE:
             self.robot.stop()
             self.state = 'stop'
 
+        def get_theta_drift(self, omega, dt):
+            "amount theta will drift while winding down"
+            drift = omega * dt
+            omega += self._wind_down(omega) * dt
+            while abs(omega) > 0.1:
+                drift += omega * dt
+                omega += self._wind_down(omega) * dt
+            return drift
+
         def get_acceleration(self, velocity):
             abs_v = abs(velocity)
 
@@ -331,24 +366,33 @@ class WallE:
             else:
                 return 0.0      # saturate velocity
 
+        def _wind_down(self, omega):
+            """return alpha for wind down"""
+            m_omega = abs(omega)
+            deccel_dir = -1 if omega > 0.0 else 1
+
+            if m_omega < 0.04:
+                return 0.0
+            if m_omega < 0.5:
+                return deccel_dir * 0.5
+            else:
+                return deccel_dir * self.WINDDOWN
+
         def get_alpha(self, omega):
             abs_omega = abs(omega)
-            sign = 1 if omega > 0.0 else -1
+
+            accel_dir = -1 if self.state == 'right' else 1
 
             if self.state == 'stop':
-                if abs_omega < 0.04:
-                    return 0.0
-                if abs_omega < 0.1:
-                    return (-1 * sign) * 0.1
-                else:
-                    return (-1 * sign) * self.WINDDOWN
+                 return self._wind_down(omega)
 
             elif self.state == 'forward':
                 return 0.0
 
             for omega_step in self.ALPHA_INCREMENTS:
+                # print(omega_step)
                 if abs_omega < omega_step:
-                    return self.ALPHA_INCREMENTS[omega_step] * sign
+                    return self.ALPHA_INCREMENTS[omega_step] * accel_dir
 
             else:
                 return 0.0  # saturate omega

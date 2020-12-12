@@ -103,9 +103,9 @@ class PositionDetector:
 
         self.B = numpy.zeros((self.num_vars, 2), dtype=float)
         # v' = v  + a * dt
-        self.B[0][0] = 1
+        self.B[3][0] = 1
         # w' = w + alpha * dt
-        self.B[1][1] = 1
+        self.B[4][1] = 1
 
         self.Q = numpy.zeros((self.num_vars, self.num_vars), dtype=float)
         # x' = x  -v sin(theta) dt
@@ -136,6 +136,10 @@ class PositionDetector:
         F[0][3] = -1 * numpy.sin(self.filter.x[2]) * dt
         # y' = y + v* cos(theta) dt
         F[1][3] = numpy.cos(self.filter.x[2]) * dt
+        # theta' = theta + w dt
+        F[2][4] = dt
+
+        return F
 
     def _get_Q_matrix(self, dt):
         return self.Q * dt
