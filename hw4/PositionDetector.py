@@ -192,8 +192,9 @@ class PositionDetector:
         self.wrap_theta()
         self.force_v_omega_to_zero()
         if self.logging:
-            print("Predicted Position ({:.3f}, {:.3f}, {:.3f}) [{:.3f}, {:.3f}]".format(self.filter.x[0], self.filter.x[1],
-                                                                                        self.filter.x[2], self.filter.x[3], self.filter.x[4]))
+            print("Predicted Position ({:.3f}, {:.3f}, {:.3f} {:.3f} {:.3f})[{:.3f}, {:.3f}]".format(self.filter.x[0], self.filter.x[1],
+                                                                                        self.filter.x[2], self.filter.x[3], self.filter.x[4],
+                                                                                                     acceleration, alpha))
 
         if read_sensors:
             image = self.camera.get_image()
@@ -223,6 +224,9 @@ class PositionDetector:
                 print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
         return self.filter.x
+
+    def get_v_omega(self):
+        return self.filter.x[3], self.filter.x[4]
 
     def get_x_y_from_d_phi(self, d, phi):
         theta = self.filter.x[2]

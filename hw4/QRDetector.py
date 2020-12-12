@@ -2,7 +2,7 @@
     created by Jordan Gassaway, 11/29/2020
     QRDetector: 
 """
-from .LandmarkDetector import LandmarkDetector
+from LandmarkDetector import LandmarkDetector
 
 from pyzbar.pyzbar import decode
 from pyzbar.wrapper import ZBarSymbol

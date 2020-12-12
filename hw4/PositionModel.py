@@ -58,7 +58,7 @@ class PositionModel():
                       4: lambda t: 3*math.pi / 2 - t}  # 270 deg - theta
 
         angle = adjustment[quadrant](theta_horizontal)
-        print('abs angle {:.4f}'.format(angle))
+        # print('abs angle {:.4f}'.format(angle))
         return angle
 
     def get_rel_angle_to(self, theta, allow_clockwise=False):
@@ -69,5 +69,5 @@ class PositionModel():
         if allow_clockwise and rel_angle > math.pi:     # subtract 2pi to make it a negitve angle (clockwise turn) instead
             rel_angle -= 2 * math.pi
 
-        print('rel angle {:.4f}'.format(rel_angle))
+        # print('rel angle {:.4f}'.format(rel_angle))
         return rel_angle
