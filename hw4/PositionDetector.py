@@ -117,6 +117,14 @@ class PositionDetector:
         self.Q[3][3] = (self.V_NOISE) ** 2
         self.Q[2][2] = (self.W_NOISE) ** 2
 
+        R = numpy.zeros((2 * self.num_landmarks, 2 * self.num_landmarks), dtype=float)
+        for i in range(self.num_landmarks):
+            k = 2 * i
+            # landmark position
+            R[k][k] = (self.D_NOISE * self.P_NOISE) ** 2
+            R[k + 1][k + 1] = (self.D_NOISE * self.P_NOISE) ** 2
+        self.filter.R = R
+
     def calibrate(self, file_path='images/'):
         """Calibrate capture images, calibrate camera, calibrate detector"""
         self.camera.calibrate(file_path)
@@ -144,30 +152,25 @@ class PositionDetector:
     def _get_Q_matrix(self, dt):
         return self.Q * dt
 
-    def _get_R_matrix(self):
-        R = numpy.zeros((2*self.num_landmarks, 2*self.num_landmarks), dtype=float)
-        for i in range(self.num_landmarks):
-            k = 2*i
-            # landmark position
-            R[k][k] = (self.D_NOISE * numpy.cos(self.filter.x[2]) * self.P_NOISE) **2
-            R[k+1][k+1] = (self.D_NOISE * numpy.sin(self.filter.x[2]) * self.P_NOISE) **2
-
-        return R
+    def _get_R_rotation(self):
+        theta = self.filter.x[2]
+        return numpy.array([[numpy.cos(-theta), -numpy.sin(-theta)], [numpy.sin(-theta), numpy.cos(-theta)]])
 
     def _get_H_matrix(self, measurements):
         num_lm_coords = 2 * self.num_landmarks
-        H = numpy.zeros((num_lm_coords, num_lm_coords + self.NUM_KINEMATIC_VARS), dtype=float)
+        T = numpy.zeros((num_lm_coords, num_lm_coords + self.NUM_KINEMATIC_VARS), dtype=float)
         for i in range(self.num_landmarks):
             if measurements[i] is not None:     # do not include landmarks that were not detected
                 k = 2*i
                 # landmark position
-                H[k][k+self.NUM_KINEMATIC_VARS] = 1.0
-                H[k+1][k+self.NUM_KINEMATIC_VARS+1] = 1.0
+                T[k][k+self.NUM_KINEMATIC_VARS] = 1.0
+                T[k+1][k+self.NUM_KINEMATIC_VARS+1] = 1.0
                 # subtract robot position
-                H[k][0] = -1.0
-                H[k+1][1] = -1.0
+                T[k][0] = -1.0
+                T[k+1][1] = -1.0
 
-        return H
+        R = self._get_R_rotation()
+        return numpy.dot(numpy.transpose(T), R)
 
     def wrap_theta(self):
         theta = self.filter.x[2]
@@ -223,7 +226,7 @@ class PositionDetector:
             if self.logging:
                 print("Relative Positions {}".format(measurements))
 
-            self.filter.update(z=self.get_z_vector(measurements), H=self._get_H_matrix(measurements), R=self._get_R_matrix())
+            self.filter.update(z=self.get_z_vector(measurements), H=self._get_H_matrix(measurements))
             if self.logging:
                 print("Updated Position ({:.3f}, {:.3f}, {:.3f})".format(*self.filter.x))
 
