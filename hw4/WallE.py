@@ -139,10 +139,10 @@ class WallE:
         self.time_since_sensor_read += dt
         read_sensors = self.time_since_sensor_read > self.UPDATE_DT
 
-        speed_r, speed_l = self.drive.get_current_speed()
-        v, omega = self.movement.get_current_v_omega(speed_r, speed_l)
 #         print("speed_r: {:.4f} speed_l: {:.4f}".format(speed_r, speed_l))
-        new_pos = self.locator.get_position(v / 100.0, omega, dt, read_sensors)
+        velocity, omega = self.locator.get_v_omega()
+        accel, alpha = self.drive.get_acceleration(velocity), self.drive.get_alpha(omega)
+        new_pos = self.locator.get_position(accel, omega, dt, read_sensors)
         self.position.set_position(new_pos[0], new_pos[1], new_pos[2])
 
         if read_sensors:
@@ -203,12 +203,14 @@ class WallE:
 
     class DriveModel():
         """Abstraction for driving the robot. Converts velocities to power settings."""
-        BASE_POWER = 0.35
+        BASE_POWER = 0.4
         R_L_OFFSET = 0.012
         SPEED_PWR_RATIO = 0.019
         BASE_SPEED = BASE_POWER / SPEED_PWR_RATIO
-        ALPHA_INCREMENTS = {0.66: 2.503, 0.925: 0.874, 1.04: 0.346, 1.419: 1.246, 1.99: 0.456 }
-        ACCEL_INCREMENTS = {0.66: 2.503, 0.925: 0.874, 1.04: 0.346, 1.419: 1.246, 1.99: 0.456 }
+        ALPHA_INCREMENTS = { 1.396: 5.585, 1.99: 0.792 }
+        ACCEL_INCREMENTS = {0.16: 0.32, 0.22: 0.08 }
+        DECEL = -0.32
+        WINDDOWN = 5.585
 
         def __init__(self):
             self.robot = jetbot.robot.Robot()
@@ -315,37 +317,41 @@ class WallE:
             self.state = 'stop'
 
         def get_acceleration(self, velocity):
-            abs_omega = abs(omega)
-            sign = 1 if omega > 0.0 else -1
-            abs_alpha = 0.0
+            abs_v = abs(velocity)
 
-            # determined experimentally
-            if abs_omega < 0.66:
-                abs_alpha = 2.503
-            elif abs_omega < 0.925:
-                abs_alpha = 0.874
-            elif abs_omega < 1.04:
-                abs_alpha = 0.346
-            elif abs_omega < 1.419:
-                abs_alpha = 1.246
-            elif abs_omega < 1.99:
-                abs_alpha = 0.456
-            else:  # omega saturates at 1.99 rad/s
-                abs_alpha = 0.0
+            if self.state == 'stop':
+                return self.DECEL if velocity > 0.02 else 0.0
+            elif self.state != 'forward':
+                return 0.0
 
-            return abs_alpha * sign
+            for a_step in self.ACCEL_INCREMENTS:
+                if abs_v < a_step:
+                    return self.ACCEL_INCREMENTS[a_step]
+
+            else:
+                return 0.0      # saturate velocity
 
         def get_alpha(self, omega):
             abs_omega = abs(omega)
             sign = 1 if omega > 0.0 else -1
 
-            # determined experimentally
+            if self.state == 'stop':
+                if abs_omega < 0.04:
+                    return 0.0
+                if abs_omega < 0.1:
+                    return (-1 * sign) * 0.1
+                else:
+                    return (-1 * sign) * self.WINDDOWN
+
+            elif self.state == 'forward':
+                return 0.0
+
             for omega_step in self.ALPHA_INCREMENTS:
                 if abs_omega < omega_step:
                     return self.ALPHA_INCREMENTS[omega_step] * sign
 
             else:
-                return 0.0
+                return 0.0  # saturate omega
 
     class MovementModel():
         """Model path planning and movement"""
@@ -407,34 +413,34 @@ class WallE:
             r = (w * (v_ratio + 1) / (v_ratio - 1))
             return r
 
-        def _get_velocity(self, vi, r):
-            """returns forward velocity of the robot (irrespective of orientation)"""
-            return r * vi / (r - self.WHEEL_SEPARATION/2)
-
-        def get_current_v_omega(self, vr, vl):
-            """get forward velocity and angular velocity from wheel velocities
-            :returns forward velocity (cm/s), angular velocity (rad/s)
-            """
-            if vr == vl:    # if speeds are the same, we are going straight (not turning)
-                return vr, 0.0
-            elif vr == -vl: # special case, rotating in place. r = w/2, v = vr
-                print(vr, vl)
-                return 0.0, vr / (self.WHEEL_SEPARATION / 2) * 0.7     # Seems to rotate slower than predicted wheel velocities
-
-            vo, vi = (vr, vl) if vr > vl else (vl, vr)
-            r = self._get_turn_radius(vo, vi)
-            v = self._get_velocity(vi, r)
-            dir = 1.0 if vr > vl else -1.0
-            return v, dir * v / r
-
-        def arc_with_r(self, r):
-            left_turn = r > 0
-            radius = abs(r)
-
-            w = self.WHEEL_SEPARATION
-            d_outer = (radius + w / 2) * 2 * math.pi
-            d_inner = (radius - w / 2) * 2 * math.pi
-            dt = (d_inner / self.MIN_SPEED)  # time to travers the arc
-
-            v_r, v_l = (d_outer / dt, d_inner / dt) if left_turn else (d_inner / dt, d_outer / dt)
-            return v_r, v_l
+#         def _get_velocity(self, vi, r):
+#             """returns forward velocity of the robot (irrespective of orientation)"""
+#             return r * vi / (r - self.WHEEL_SEPARATION/2)
+#
+#         def get_current_v_omega(self, vr, vl):
+#             """get forward velocity and angular velocity from wheel velocities
+#             :returns forward velocity (cm/s), angular velocity (rad/s)
+#             """
+#             if vr == vl:    # if speeds are the same, we are going straight (not turning)
+#                 return vr, 0.0
+#             elif vr == -vl: # special case, rotating in place. r = w/2, v = vr
+# #                 print(vr, vl)
+#                 return 0.0, vr / (self.WHEEL_SEPARATION / 2) * 0.5     # Seems to rotate slower than predicted wheel velocities
+#
+#             vo, vi = (vr, vl) if vr > vl else (vl, vr)
+#             r = self._get_turn_radius(vo, vi)
+#             v = self._get_velocity(vi, r)
+#             dir = 1.0 if vr > vl else -1.0
+#             return v, dir * v / r
+#
+#         def arc_with_r(self, r):
+#             left_turn = r > 0
+#             radius = abs(r)
+#
+#             w = self.WHEEL_SEPARATION
+#             d_outer = (radius + w / 2) * 2 * math.pi
+#             d_inner = (radius - w / 2) * 2 * math.pi
+#             dt = (d_inner / self.MIN_SPEED)  # time to travers the arc
+#
+#             v_r, v_l = (d_outer / dt, d_inner / dt) if left_turn else (d_inner / dt, d_outer / dt)
+#             return v_r, v_l

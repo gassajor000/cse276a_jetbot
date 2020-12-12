@@ -16,7 +16,7 @@ class PositionDetector:
     D_NOISE = 0.05     # +/- 5 cm on d measurements
     P_NOISE = numpy.deg2rad(5)     # +/- 5 degrees on phi measurements
     ESTIMATION_PROXIMITY = 0.25  # Bias position readings to within 25cm of predicted position
-    NUM_KINEMATIC_VARS = 3
+    NUM_KINEMATIC_VARS = 5
 
     def __init__(self, landmark_detector: LandmarkDetector, init_pos=(0.0, 0.0, 0.0), model=None, camera_instance=None):
         """
@@ -82,6 +82,7 @@ class PositionDetector:
         self.filter = KalmanFilter(dim_x=self.num_vars, dim_z=self.num_landmarks*2)
         init_x = numpy.zeros(self.num_vars, dtype=float)
         init_x[0], init_x[1], init_x[2] = init_pos[0], init_pos[1], init_pos[2]
+        init_x[3], init_x[4] = 0.0, 0.0     # initial velocity and omega
 
         landmark_positions = self.detector.get_landmark_positions()
         for i in range(self.num_landmarks):
@@ -95,10 +96,26 @@ class PositionDetector:
         self.filter.x = init_x
 
         p = numpy.zeros((self.num_vars, self.num_vars))
-        p[0][0] = 1
-        p[1][1] = 1
-        p[2][2] = 1
+        p[0][0] = 0.01
+        p[1][1] = 0.01
+        p[2][2] = 0.1
         self.filter.P = p * .25
+
+        self.B = numpy.zeros((self.num_vars, 2), dtype=float)
+        # v' = v  + a * dt
+        self.B[0][0] = 1
+        # w' = w + alpha * dt
+        self.B[1][1] = 1
+
+        self.Q = numpy.zeros((self.num_vars, self.num_vars), dtype=float)
+        # x' = x  -v sin(theta) dt
+        self.Q[0][0] = 0.5 * (self.V_NOISE) **2
+        # y' = y + v cos(theta) dt
+        self.Q[1][1] = 0.5 * (self.V_NOISE) **2
+        # theta' = theta + omega dt
+        self.Q[2][2] = (self.W_NOISE) ** 2
+        self.Q[3][3] = (self.V_NOISE) ** 2
+        self.Q[2][2] = (self.W_NOISE) ** 2
 
     def calibrate(self, file_path='images/'):
         """Calibrate capture images, calibrate camera, calibrate detector"""
@@ -110,26 +127,18 @@ class PositionDetector:
         self.camera.close()
 
     def _get_B_matrix(self, dt):
-        B = numpy.zeros((self.num_vars, 2), dtype=float)
-        # x' = x  -v sin(theta) dt
-        B[0][0] =  -numpy.sin(self.filter.x[2]) * dt
-        # y' = y + v cos(theta) dt
-        B[1][0] = numpy.cos(self.filter.x[2]) * dt
-        # theta' = theta + omega dt
-        B[2][1] = dt
+        return self.B * dt
 
-        return B
+    def _get_F_matrix(self, dt):
+        F = numpy.eye(self.num_vars)
+
+        # x' = x - v * sin(theta) dt
+        F[0][3] = -1 * numpy.sin(self.filter.x[2]) * dt
+        # y' = y + v* cos(theta) dt
+        F[1][3] = numpy.cos(self.filter.x[2]) * dt
 
     def _get_Q_matrix(self, dt):
-        Q = numpy.zeros((self.num_vars, self.num_vars), dtype=float)
-        # x' = x  -v sin(theta) dt
-        Q[0][0] = (-numpy.sin(self.filter.x[2]) * dt * self.V_NOISE) **2
-        # y' = y + v cos(theta) dt
-        Q[1][0] = (numpy.cos(self.filter.x[2]) * dt * self.V_NOISE) **2
-        # theta' = theta + omega dt
-        Q[2][1] = (dt * self.W_NOISE) ** 2
-
-        return Q
+        return self.Q * dt
 
     def _get_R_matrix(self):
         R = numpy.zeros((2*self.num_landmarks, 2*self.num_landmarks), dtype=float)
@@ -164,7 +173,13 @@ class PositionDetector:
         elif theta < 0:
             self.filter.x[2] += pi_2
 
-    def get_position(self, velocity, omega, dt, read_sensors=True):
+    def force_v_omega_to_zero(self):
+        if self.filter.x[3] < 0.02:
+            self.filter.x[3] = 0.0
+        if abs(self.filter.x[4]) < 0.1:
+            self.filter.x[4] = 0.0
+
+    def get_position(self, acceleration, alpha, dt, read_sensors=True):
         """
         Get the estimated position of the robot
         :param velocity: forward velocity of the robot (rel to robot, m/s)
@@ -173,11 +188,12 @@ class PositionDetector:
         :return: tuple (x, y, theta, v, omega) position, orientation, speed, and angular speed of the robot
         """
         # predict
-        self.filter.predict(u=numpy.array([velocity, omega]), B=self._get_B_matrix(dt), Q=self._get_Q_matrix(dt))
+        self.filter.predict(u=numpy.array([acceleration, alpha]), B=self._get_B_matrix(dt), Q=self._get_Q_matrix(dt), F=self._get_F_matrix(dt))
         self.wrap_theta()
+        self.force_v_omega_to_zero()
         if self.logging:
             print("Predicted Position ({:.3f}, {:.3f}, {:.3f}) [{:.3f}, {:.3f}]".format(self.filter.x[0], self.filter.x[1],
-                                                                                        self.filter.x[2], velocity, omega))
+                                                                                        self.filter.x[2], self.filter.x[3], self.filter.x[4]))
 
         if read_sensors:
             image = self.camera.get_image()
