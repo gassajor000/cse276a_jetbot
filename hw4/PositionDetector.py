@@ -170,7 +170,7 @@ class PositionDetector:
                 T[k+1][1] = -1.0
 
         R = self._get_R_rotation()
-        return numpy.dot(numpy.transpose(T), R)
+        return numpy.dot(numpy.transpose(T), R).transpose()
 
     def wrap_theta(self):
         theta = self.filter.x[2]
